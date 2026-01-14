@@ -45,10 +45,7 @@
 
         <div id="tab-scan" class="view active">
             <p class="instruction-text">Scan tag to update location.</p>
-            
-            <div class="video-container">
-                </div> 
-            
+            <div class="video-container"></div> 
             <button id="scan-btn" class="primary-btn">Start Scanner</button>
             
             <div id="scan-result" class="scan-overlay hidden">
@@ -61,21 +58,21 @@
         <div id="tab-search" class="view">
             <h2>Find Asset</h2>
             
-            <div style="display: flex; gap: 10px; width: 100%; margin-bottom: 20px;">
-                <input type="text" id="search-vin" placeholder="Last 8 of VIN" class="input-field" style="margin-bottom: 0;">
-                <button id="clear-search-btn" class="secondary-btn" style="margin-top: 0; padding: 0 20px; font-weight: bold; font-size: 1.2rem;">X</button>
+            <div class="search-container">
+                <input type="text" id="search-vin" placeholder="Last 8 of VIN" class="input-field search-input">
+                <button id="clear-search-btn" class="secondary-btn clear-btn">X</button>
             </div>
 
-            <button id="search-btn" class="primary-btn">Locate</button>
+            <button id="search-btn" class="primary-btn">FIND</button>
             
             <div id="search-results" class="result-box hidden">
                 <p><strong>PLX ID:</strong> <span id="res-id">--</span></p>
                 <p><strong>Customer:</strong> <span id="res-cust">--</span></p>
                 <p><strong>Last Seen:</strong> <span id="res-time">--</span></p>
                 
-                <a id="res-map" href="#" target="_blank" class="map-link hidden">View on Google Maps</a>
+                <button id="locate-btn" class="primary-btn" style="display:none; width: 100%; background-color: #03dac6; color: #000; margin-top: 20px; font-weight: bold;">LOCATE</button>
                 
-                <button id="reprint-btn" class="secondary-btn hidden" style="width: 100%; border-color: #bb86fc; color: #bb86fc;">Reprint Tag</button>
+                <button id="reprint-btn" class="secondary-btn" style="display:none; width: 100%; border-color: #bb86fc; color: #bb86fc; margin-top: 15px;">Reprint Tag</button>
             </div>
         </div>
 

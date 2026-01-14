@@ -16,17 +16,16 @@ const nextPlxDisplay = document.getElementById('next-plx-display');
 const generateBtn = document.getElementById('generate-btn');
 const regStatus = document.getElementById('reg-status');
 
-// Tag Generation Elements
 const tagPreviewArea = document.getElementById('tag-preview-area');
 const tagCanvas = document.getElementById('tag-canvas');
 const printBtn = document.getElementById('print-btn');
 
-// Search Elements
 const searchInput = document.getElementById('search-vin');
-const searchBtn = document.getElementById('search-btn');
+const searchBtn = document.getElementById('search-btn'); 
 const clearSearchBtn = document.getElementById('clear-search-btn');
 const resultBox = document.getElementById('search-results');
 const reprintBtn = document.getElementById('reprint-btn');
+const locateBtn = document.getElementById('locate-btn'); 
 
 const scanBtn = document.getElementById('scan-btn');
 const scanAgainBtn = document.getElementById('scan-again-btn');
@@ -202,7 +201,7 @@ if(printBtn) {
     });
 }
 
-// --- TAB 3: SEARCH & REPRINT LOGIC ---
+// --- TAB 3: SEARCH LOGIC ---
 
 // 1. Clear Button Logic
 clearSearchBtn.addEventListener('click', () => {
@@ -210,54 +209,65 @@ clearSearchBtn.addEventListener('click', () => {
     resultBox.classList.add('hidden');
     document.getElementById('res-id').innerText = '--';
     document.getElementById('res-cust').innerText = '--';
-    reprintBtn.classList.add('hidden');
-    document.getElementById('res-map').classList.add('hidden');
+    reprintBtn.style.display = 'none'; 
+    locateBtn.style.display = 'none';
 });
 
-// 2. Search Logic
+// 2. Search Logic ("FIND" Button)
 searchBtn.addEventListener('click', async () => {
     const vinQuery = searchInput.value.trim();
+    const activeCustomer = customerSelect.value; 
+
     if (vinQuery.length < 4) { alert("Enter at least 4 digits of VIN"); return; }
     
-    // Reset UI before search
     resultBox.classList.add('hidden');
-    reprintBtn.classList.add('hidden');
-    document.getElementById('res-map').classList.add('hidden');
+    reprintBtn.style.display = 'none';
+    locateBtn.style.display = 'none';
 
+    // Strict Customer Filter
     const { data, error } = await supabaseClient
-        .from('vehicle_assets')
+        .from('vehicle_assets') 
         .select('*')
+        .eq('customer', activeCustomer)
         .ilike('vin', `%${vinQuery}`)
         .limit(1);
 
     if (error || !data || data.length === 0) {
-        alert("No asset found.");
+        alert(`No asset found for customer: ${activeCustomer}`);
     } else {
         const asset = data[0];
-        resultBox.classList.remove('hidden'); // Show results box
+        resultBox.classList.remove('hidden'); 
         
-        // Fill Data
         document.getElementById('res-id').innerText = asset.plx_id;
         document.getElementById('res-cust').innerText = asset.customer;
         
         const timeString = asset.updated_at ? new Date(asset.updated_at).toLocaleString() : "Never Scanned";
         document.getElementById('res-time').innerText = timeString;
         
-        // Setup Map Link
-        const mapLink = document.getElementById('res-map');
+        // --- LOCATE BUTTON (Corrected URL) ---
+        locateBtn.style.display = 'block'; 
+        locateBtn.style.backgroundColor = '#2979ff'; 
+        locateBtn.style.color = '#ffffff';
+        
         if (asset.latitude && asset.longitude) {
-            mapLink.href = `http://maps.google.com/maps?q=$${asset.latitude},${asset.longitude}`;
-            mapLink.classList.remove('hidden');
-            mapLink.style.display = 'block';
+            locateBtn.style.opacity = "1";
+            locateBtn.innerText = "LOCATE (OPEN MAPS)";
+            locateBtn.onclick = function() {
+                // FIXED: Using standard Google Maps URL format
+                const url = `https://www.google.com/maps?q=${asset.latitude},${asset.longitude}`;
+                window.open(url, '_blank');
+            };
+        } else {
+            locateBtn.style.opacity = "0.5";
+            locateBtn.innerText = "NO GPS DATA YET";
+            locateBtn.onclick = function() {
+                alert("This asset has no coordinates in the 'vehicle_assets' table yet. Please scan it first.");
+            };
         }
 
-        // Setup Reprint Button
-        reprintBtn.classList.remove('hidden'); // UNHIDE
-        reprintBtn.style.display = 'block'; // FORCE SHOW
-        
-        // IMPORTANT: We use the hidden 'tagCanvas' from the Register tab to draw this ID temporarily
+        // --- REPRINT BUTTON ---
+        reprintBtn.style.display = 'block'; 
         reprintBtn.onclick = function() {
-            console.log("Reprinting ID:", asset.plx_id);
             drawPLXTag(asset.plx_id, tagCanvas);
             printTagImage(tagCanvas);
         };
