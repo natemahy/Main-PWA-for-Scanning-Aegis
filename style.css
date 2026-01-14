@@ -32,6 +32,7 @@ body {
     justify-content: center;
     padding: 20px;
     width: 100%;
+    overflow-y: auto; /* Allow scrolling within the container if content is tall */
 }
 
 header {
@@ -42,6 +43,7 @@ header {
     text-align: center;
     background-color: var(--surface-color);
     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    z-index: 10;
 }
 
 h1 {
@@ -58,6 +60,8 @@ h1 {
     justify-content: center;
     width: 100%;
     animation: fadeIn 0.3s ease-in-out;
+    padding-bottom: 80px; /* Space for bottom nav */
+    padding-top: 80px; /* Space for header */
 }
 
 .view.active {
@@ -84,6 +88,7 @@ h1 {
     transition: transform 0.1s;
     width: 80%;
     max-width: 300px;
+    margin-top: 10px;
 }
 
 .primary-btn:active {
@@ -150,4 +155,41 @@ h1 {
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* Inputs & Dropdowns */
+.customer-dropdown {
+    background: #333; color: white; border: none; padding: 10px; border-radius: 8px; font-size: 1rem; margin-top: 5px; width: 100%; max-width: 200px; text-align: center;
+}
+.input-field {
+    background: #1e1e1e; border: 1px solid #444; color: white; padding: 15px; width: 100%; border-radius: 8px; margin-bottom: 20px; font-size: 1.1rem;
+}
+.info-box {
+    background: #2a2a2a; padding: 20px; border-radius: 12px; margin-bottom: 20px; width: 100%; text-align: center;
+}
+.info-box h1 { font-size: 3rem; color: #bb86fc; margin: 10px 0; }
+
+/* Bottom Navigation */
+.bottom-nav {
+    position: fixed; bottom: 0; left: 0; width: 100%; background: #1e1e1e; display: flex; justify-content: space-around; padding: 15px 0; border-top: 1px solid #333; z-index: 100; padding-bottom: max(15px, env(safe-area-inset-bottom)); /* iOS Safe Area */
+}
+.nav-btn {
+    background: none; border: none; color: #888; font-size: 1rem; font-weight: bold; cursor: pointer;
+}
+.nav-btn.active { color: #bb86fc; }
+
+/* Search Results */
+.result-box {
+    background: #222; padding: 20px; border-radius: 10px; margin-top: 20px; text-align: left; width: 100%;
+}
+.map-link {
+    display: block; background: #03dac6; color: black; text-align: center; padding: 10px; border-radius: 5px; margin-top: 15px; text-decoration: none; font-weight: bold;
+}
+.scan-overlay {
+    position: absolute; bottom: 80px; left: 20px; right: 20px; background: rgba(0,0,0,0.9); padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #bb86fc; z-index: 50;
+}
+
+/* UTILITY CLASSES */
+.hidden { 
+    display: none !important; 
 }
