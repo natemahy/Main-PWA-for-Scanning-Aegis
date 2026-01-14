@@ -1,0 +1,153 @@
+:root {
+    --bg-color: #121212;
+    --surface-color: #1e1e1e;
+    --primary-color: #bb86fc;
+    --secondary-color: #03dac6;
+    --text-color: #ffffff;
+    --subtext-color: #a0a0a0;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Prevent scrolling like a web page */
+}
+
+.app-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    width: 100%;
+}
+
+header {
+    position: absolute;
+    top: 0;
+    width: 100%;
+    padding: 20px;
+    text-align: center;
+    background-color: var(--surface-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+h1 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+}
+
+/* View Management */
+.view {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.view.active {
+    display: flex;
+}
+
+/* Typography & Elements */
+.instruction-text {
+    color: var(--subtext-color);
+    margin-bottom: 40px;
+    text-align: center;
+}
+
+.primary-btn {
+    background-color: var(--primary-color);
+    color: #000;
+    border: none;
+    padding: 16px 32px;
+    border-radius: 50px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(187, 134, 252, 0.3);
+    transition: transform 0.1s;
+    width: 80%;
+    max-width: 300px;
+}
+
+.primary-btn:active {
+    transform: scale(0.96);
+}
+
+.secondary-btn {
+    background: transparent;
+    border: 1px solid var(--subtext-color);
+    color: var(--subtext-color);
+    padding: 12px 24px;
+    border-radius: 50px;
+    margin-top: 20px;
+    cursor: pointer;
+}
+
+/* Scanning Placeholder Styles */
+.video-container {
+    width: 100%;
+    max-width: 350px;
+    height: 350px;
+    background-color: #000;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border: 2px solid var(--surface-color);
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.scanner-laser {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: red;
+    box-shadow: 0 0 10px red;
+    animation: scan 2s infinite;
+}
+
+@keyframes scan {
+    0% { top: 0; }
+    50% { top: 100%; }
+    100% { top: 0; }
+}
+
+/* Success Styles */
+.success-icon {
+    font-size: 4rem;
+    color: var(--secondary-color);
+    margin-bottom: 20px;
+    border: 3px solid var(--secondary-color);
+    border-radius: 50%;
+    width: 100px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

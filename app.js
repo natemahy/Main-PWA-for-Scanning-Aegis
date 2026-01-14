@@ -7,7 +7,9 @@ let videoStream = null;
 // --- SUPABASE CONFIG ---
 const SUPABASE_URL = 'https://svgekpaopjfgbczrgrgf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2Z2VrcGFvcGpmZ2JjenJncmdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxODE5MzAsImV4cCI6MjA3OTc1NzkzMH0.3OqZ6Zm-2AhDYjn31TMg8q-8ChtF7tTBaZBY5m1gkxI';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// FIX: Renamed variable from 'supabase' to 'supabaseClient' to avoid conflict
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // UI Elements
 const video = document.createElement('video');
@@ -110,8 +112,8 @@ function stopCamera() {
 
 // --- SUCCESS, GPS & SUPABASE LOGIC ---
 
+// Paste this over your existing onScanSuccess function
 function onScanSuccess(tagId, orientation) {
-    // 1. Stop Camera
     stopCamera();
     switchView(successView);
     
@@ -121,7 +123,6 @@ function onScanSuccess(tagId, orientation) {
     heading.innerText = `Tag ID: ${tagId}`;
     msg.innerHTML = `Orientation: ${orientation}<br>Acquiring GPS...`;
 
-    // 2. Get GPS
     if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
@@ -130,8 +131,8 @@ function onScanSuccess(tagId, orientation) {
                 
                 msg.innerHTML = `Found Location... Saving to Cloud...`;
 
-                // 3. Send to Supabase
-                const { data, error } = await supabase
+                // FIX: Using 'supabaseClient' here
+                const { data, error } = await supabaseClient
                     .from('plx_scans')
                     .insert([
                         { 
@@ -149,8 +150,7 @@ function onScanSuccess(tagId, orientation) {
                         Lat: ${lat.toFixed(6)}, Long: ${lng.toFixed(6)}
                     `;
                 } else {
-                    // 4. Success UI with Google Maps Link
-                    const mapLink = `https://www.google.com/maps?q=${lat},${lng}`;
+                    const mapLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
                     
                     msg.innerHTML = `
                         <div style="color: #03dac6; font-size: 1.2rem; margin-bottom: 10px;">✓ Saved to Database</div>
