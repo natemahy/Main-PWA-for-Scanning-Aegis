@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PLX Scanner</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PLX Scanner">
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script async src="https://docs.opencv.org/4.5.0/opencv.js" type="text/javascript"></script>
+
+    <script async src="https://docs.opencv.org/4.5.0/opencv.js" type="text/javascript"></script>
+
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <header>
+            <h1>PLX Scanner</h1>
+        </header>
+
+        <div id="home-view" class="view active">
+            <p class="instruction-text">Ready to scan location coordinates.</p>
+            <button id="scan-btn" class="primary-btn">
+                Scan PLX Location
+            </button>
+        </div>
+
+        <div id="scan-view" class="view">
+            <div class="video-container">
+                <div class="video-placeholder">
+                    <div class="scanner-laser"></div>
+                    <p>Camera View</p>
+                </div>
+            </div>
+            <p class="status-text">Scanning...</p>
+            <button id="cancel-btn" class="secondary-btn">Cancel</button>
+        </div>
+
+        <div id="success-view" class="view">
+            <div class="success-icon">✓</div>
+            <h2>Scan Complete</h2>
+            <p>Coordinates Acquired</p>
+            <button id="reset-btn" class="primary-btn">Scan Next</button>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
