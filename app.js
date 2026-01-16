@@ -1,5 +1,5 @@
 // --- CONFIGURATION ---
-const GRID_SIZE = 7; // UPDATED TO 7x7
+const GRID_SIZE = 7; 
 const THRESH_VAL = 100;
 let isScanning = false;
 let videoStream = null;
@@ -16,12 +16,10 @@ const nextPlxDisplay = document.getElementById('next-plx-display');
 const generateBtn = document.getElementById('generate-btn');
 const regStatus = document.getElementById('reg-status');
 
-// Tag Generation Elements
 const tagPreviewArea = document.getElementById('tag-preview-area');
 const tagCanvas = document.getElementById('tag-canvas');
 const printBtn = document.getElementById('print-btn');
 
-// Search Elements
 const searchInput = document.getElementById('search-vin');
 const searchBtn = document.getElementById('search-btn'); 
 const clearSearchBtn = document.getElementById('clear-search-btn');
@@ -34,7 +32,7 @@ const scanAgainBtn = document.getElementById('scan-again-btn');
 const scanOverlay = document.getElementById('scan-result');
 const videoContainer = document.querySelector('.video-container');
 
-// Setup Canvas for OpenCV
+// Setup Canvas
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 videoContainer.innerHTML = '';
@@ -44,6 +42,9 @@ canvas.style.height = '100%';
 
 // --- LOAD CUSTOMERS ---
 async function loadCustomers() {
+    // Only tries to populate if the element exists (which it now only does in Register tab)
+    if(!customerSelect) return;
+    
     customerSelect.innerHTML = '<option>Loading...</option>';
     const { data, error } = await supabaseClient.from('plx_customers').select('name').order('name', { ascending: true });
 
@@ -87,16 +88,26 @@ window.switchTab = function(tabId) {
 }
 
 // --- TAB 1: REGISTER LOGIC ---
-customerSelect.addEventListener('change', () => {
-    if(tagPreviewArea) tagPreviewArea.style.display = 'none';
-    fetchNextPLX();
-});
+if(customerSelect) {
+    customerSelect.addEventListener('change', () => {
+        if(tagPreviewArea) tagPreviewArea.style.display = 'none';
+        fetchNextPLX();
+    });
+}
 
 async function fetchNextPLX() {
-    const customer = customerSelect.value;
-    const { data, error } = await supabaseClient.rpc('get_next_plx_id', { client_name: customer });
-    if (data) nextPlxDisplay.innerText = data;
-    else nextPlxDisplay.innerText = "1";
+    const { data, error } = await supabaseClient
+        .from('vehicle_assets')
+        .select('plx_id')
+        .order('plx_id', { ascending: false })
+        .limit(1);
+
+    if (data && data.length > 0) {
+        const maxId = data[0].plx_id;
+        nextPlxDisplay.innerText = (maxId + 1).toString();
+    } else {
+        nextPlxDisplay.innerText = "1";
+    }
 }
 
 generateBtn.addEventListener('click', async () => {
@@ -130,39 +141,31 @@ generateBtn.addEventListener('click', async () => {
     }
 });
 
-// --- TAG GENERATOR (UPDATED FOR 7x7 + ANCHORS) ---
+// --- TAG GENERATOR (7x7) ---
 function drawPLXTag(id, canvasElement) {
     const ctx = canvasElement.getContext('2d');
     const size = 300;
-    const gridSize = 7; // 7x7
+    const gridSize = 7; 
     const border = 50; 
     const cell = (size - (border * 2)) / gridSize;
 
-    // Clear Canvas
     ctx.fillStyle = "white";
     ctx.fillRect(0,0,size,size);
 
-    // 1. Math Logic (Using BigInt for 49 bits)
     const idBig = BigInt(id);
     const safety = idBig % 255n;
-    const anchors = 15n; // Binary 1111 (Decimal 15)
-    
-    // Payload: [ANCHORS (4)] + [ID (37)] + [SAFETY (8)]
-    // Total 49 bits
+    const anchors = 15n;
     const payload = (anchors << 45n) | (idBig << 8n) | safety;
 
-    // 2. Draw Black Background
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, size, size);
 
-    // 3. Draw White Dots
     ctx.fillStyle = "white";
     let bitIndex = 0n;
     
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
             if (bitIndex < 49n) {
-                // Check bit
                 const bit = (payload >> bitIndex) & 1n;
                 if (bit === 1n) {
                     ctx.fillRect(border + (col * cell), border + (row * cell), cell, cell);
@@ -172,37 +175,15 @@ function drawPLXTag(id, canvasElement) {
         }
     }
     
-    // ID Text
     ctx.font = "bold 40px Arial";
     ctx.fillStyle = "white";
     ctx.textAlign = "center";
     ctx.fillText(id, size/2, size - 10);
 }
 
-// --- PRINT LOGIC ---
 function printTagImage(canvasElement) {
     const dataUrl = canvasElement.toDataURL();
-    const windowContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Print PLX Tag</title>
-            <style>
-                @media print {
-                    @page { size: 1in 1in; margin: 0; }
-                    body { margin: 0; padding: 0; }
-                    img { width: 1in; height: 1in; display: block; }
-                }
-                body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                img { width: 1in; height: 1in; border: 1px dotted #ccc; }
-            </style>
-        </head>
-        <body>
-            <img src="${dataUrl}">
-            <script>window.onload = function() { window.print(); }<\/script>
-        </body>
-        </html>
-    `;
+    const windowContent = `<html><head><style>@media print { body{margin:0;} img{width:1in;height:1in;} }</style></head><body><img src="${dataUrl}"><script>window.onload=function(){window.print();}<\/script></body></html>`;
     const printWin = window.open('', '', 'width=300,height=300');
     printWin.document.open();
     printWin.document.write(windowContent);
@@ -210,41 +191,34 @@ function printTagImage(canvasElement) {
 }
 
 if(printBtn) {
-    printBtn.addEventListener('click', () => {
-        printTagImage(tagCanvas);
-    });
+    printBtn.addEventListener('click', () => { printTagImage(tagCanvas); });
 }
 
-// --- TAB 3: SEARCH LOGIC ---
-
+// --- SEARCH LOGIC (GLOBAL) ---
 clearSearchBtn.addEventListener('click', () => {
     searchInput.value = '';
     resultBox.classList.add('hidden');
-    document.getElementById('res-id').innerText = '--';
-    document.getElementById('res-cust').innerText = '--';
     reprintBtn.style.display = 'none'; 
     locateBtn.style.display = 'none';
 });
 
 searchBtn.addEventListener('click', async () => {
     const vinQuery = searchInput.value.trim();
-    const activeCustomer = customerSelect.value; 
-
     if (vinQuery.length < 4) { alert("Enter at least 4 digits of VIN"); return; }
     
     resultBox.classList.add('hidden');
     reprintBtn.style.display = 'none';
     locateBtn.style.display = 'none';
 
+    // Global Search (No Customer Filter)
     const { data, error } = await supabaseClient
         .from('vehicle_assets') 
         .select('*')
-        .eq('customer', activeCustomer)
         .ilike('vin', `%${vinQuery}`)
         .limit(1);
 
     if (error || !data || data.length === 0) {
-        alert(`No asset found for customer: ${activeCustomer}`);
+        alert("No asset found matching that VIN.");
     } else {
         const asset = data[0];
         resultBox.classList.remove('hidden'); 
@@ -255,7 +229,6 @@ searchBtn.addEventListener('click', async () => {
         const timeString = asset.updated_at ? new Date(asset.updated_at).toLocaleString() : "Never Scanned";
         document.getElementById('res-time').innerText = timeString;
         
-        // --- LOCATE BUTTON ---
         locateBtn.style.display = 'block'; 
         locateBtn.style.backgroundColor = '#2979ff'; 
         locateBtn.style.color = '#ffffff';
@@ -264,18 +237,17 @@ searchBtn.addEventListener('click', async () => {
             locateBtn.style.opacity = "1";
             locateBtn.innerText = "LOCATE (OPEN MAPS)";
             locateBtn.onclick = function() {
-                const url = `https://www.google.com/maps?q=${asset.latitude},${asset.longitude}`;
+                const url = `http://googleusercontent.com/maps.google.com/?q=${asset.latitude},${asset.longitude}`;
                 window.open(url, '_blank');
             };
         } else {
             locateBtn.style.opacity = "0.5";
             locateBtn.innerText = "NO GPS DATA YET";
             locateBtn.onclick = function() {
-                alert("This asset has no coordinates in the 'vehicle_assets' table yet. Please scan it first.");
+                alert("This asset has no coordinates in the database yet.");
             };
         }
 
-        // --- REPRINT BUTTON ---
         reprintBtn.style.display = 'block'; 
         reprintBtn.onclick = function() {
             drawPLXTag(asset.plx_id, tagCanvas);
@@ -284,8 +256,7 @@ searchBtn.addEventListener('click', async () => {
     }
 });
 
-// --- TAB 2: SCANNER LOGIC ---
-
+// --- SCANNER LOGIC (GLOBAL UPDATE) ---
 scanBtn.addEventListener('click', startCamera);
 
 scanAgainBtn.addEventListener('click', () => {
@@ -300,14 +271,7 @@ async function startCamera() {
     scanOverlay.classList.add('hidden');
 
     try {
-        const constraints = {
-            video: {
-                facingMode: 'environment',
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            },
-            audio: false
-        };
+        const constraints = { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false };
         videoStream = await navigator.mediaDevices.getUserMedia(constraints);
         const video = document.createElement('video');
         video.srcObject = videoStream;
@@ -327,10 +291,7 @@ async function startCamera() {
 
 function stopCamera() {
     isScanning = false;
-    if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-        videoStream = null;
-    }
+    if (videoStream) { videoStream.getTracks().forEach(track => track.stop()); videoStream = null; }
     scanBtn.style.display = 'block';
 }
 
@@ -339,38 +300,37 @@ function onTagFound(id) {
     scanOverlay.classList.remove('hidden');
     
     const scanMsg = document.getElementById('scan-msg');
-    const customer = customerSelect.value;
     
-    scanMsg.innerHTML = `Found Tag <strong>${id}</strong><br>Updating Location for <strong>${customer}</strong>...`;
+    // UPDATED: No Customer Dropdown check. Just update the ID.
+    scanMsg.innerHTML = `Found Tag <strong>${id}</strong><br>Updating Location...`;
 
     if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
 
-            const { error } = await supabaseClient
+            // 1. Update the Asset (Global ID match)
+            const { error, data } = await supabaseClient
                 .from('vehicle_assets')
                 .update({ latitude: lat, longitude: lng, updated_at: new Date() })
-                .eq('customer', customer)
-                .eq('plx_id', id);
+                .eq('plx_id', id)
+                .select(); // Select the data so we know who it belongs to
 
-            if (error) {
-                scanMsg.innerHTML = `<span style="color:red">Error: Tag ${id} is not registered for ${customer} yet.</span>`;
+            if (error || !data || data.length === 0) {
+                scanMsg.innerHTML = `<span style="color:red">Error: Tag ${id} is not registered in database.</span>`;
             } else {
-                const { data: assetData } = await supabaseClient
-                    .from('vehicle_assets')
-                    .select('id')
-                    .eq('customer', customer)
-                    .eq('plx_id', id)
-                    .single();
+                // Success: Get the customer name from the response
+                const assetData = data[0];
+                const customerName = assetData.customer;
 
-                if (assetData) {
-                     await supabaseClient.from('scan_history').insert([{ asset_id: assetData.id, latitude: lat, longitude: lng }]);
-                }
+                // 2. Log History
+                await supabaseClient.from('scan_history').insert([{ asset_id: assetData.id, latitude: lat, longitude: lng }]);
 
+                // 3. Show Success Message with Customer Name
                 scanMsg.innerHTML = `
                     <div style="color:#03dac6; font-size:1.4rem; margin-bottom:5px;">✓ LOCATION UPDATED</div>
-                    <strong>${customer} - Tag ${id}</strong><br>
+                    <strong>${customerName}</strong><br>
+                    Tag ${id}<br>
                     Lat: ${lat.toFixed(5)}<br>
                     Long: ${lng.toFixed(5)}
                 `;
@@ -383,12 +343,10 @@ function onTagFound(id) {
     }
 }
 
-// --- OPENCV VISION CORE ---
-
+// --- VISION CORE (7x7) ---
 function processVideo(videoElement) {
     if (!isScanning) return;
     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
     let src = cv.imread(canvas);
     let gray = new cv.Mat(), binary = new cv.Mat(), contours = new cv.MatVector(), hierarchy = new cv.Mat();
     let warped = new cv.Mat(), M = new cv.Mat(), dsize = new cv.Size(300, 300);
@@ -401,7 +359,6 @@ function processVideo(videoElement) {
         for (let i = 0; i < contours.size(); ++i) {
             let cnt = contours.get(i);
             if (cv.contourArea(cnt) < 1000) continue;
-
             let peri = cv.arcLength(cnt, true);
             let approx = new cv.Mat();
             cv.approxPolyDP(cnt, approx, 0.04 * peri, true);
@@ -410,16 +367,11 @@ function processVideo(videoElement) {
                 let points = [];
                 for (let j = 0; j < 4; j++) points.push({ x: approx.data32S[j*2], y: approx.data32S[j*2+1] });
                 let sortedPoints = sortPoints(points);
-
-                let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-                    sortedPoints[0].x, sortedPoints[0].y, sortedPoints[1].x, sortedPoints[1].y,
-                    sortedPoints[2].x, sortedPoints[2].y, sortedPoints[3].x, sortedPoints[3].y
-                ]);
+                let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [sortedPoints[0].x, sortedPoints[0].y, sortedPoints[1].x, sortedPoints[1].y, sortedPoints[2].x, sortedPoints[2].y, sortedPoints[3].x, sortedPoints[3].y]);
                 let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0,0, 299,0, 299,299, 0,299]);
-
                 M = cv.getPerspectiveTransform(srcTri, dstTri);
                 cv.warpPerspective(binary, warped, M, dsize);
-
+                
                 let roi = warped.roi(new cv.Rect(145, 145, 10, 10));
                 let mean = cv.mean(roi);
                 roi.delete();
@@ -427,25 +379,16 @@ function processVideo(videoElement) {
                 if (mean[0] <= 128) {
                     let bitGrid = extractBitGrid(warped);
                     let result = tryDecode(bitGrid);
-                    if (result.valid) {
-                        onTagFound(result.id);
-                        srcTri.delete(); dstTri.delete(); approx.delete(); 
-                        break; 
-                    }
+                    if (result.valid) { onTagFound(result.id); srcTri.delete(); dstTri.delete(); approx.delete(); break; }
                 }
                 srcTri.delete(); dstTri.delete();
             }
             approx.delete();
         }
         if (isScanning) requestAnimationFrame(() => processVideo(videoElement));
-    } catch (err) {
-        console.error("OpenCV Error:", err);
-    } finally {
-        src.delete(); gray.delete(); binary.delete(); contours.delete(); hierarchy.delete(); warped.delete(); M.delete();
-    }
+    } catch (err) { console.error("OpenCV Error:", err); } 
+    finally { src.delete(); gray.delete(); binary.delete(); contours.delete(); hierarchy.delete(); warped.delete(); M.delete(); }
 }
-
-// --- HELPER FUNCTIONS ---
 
 function sortPoints(pts) {
     pts.sort((a, b) => a.y - b.y);
@@ -453,14 +396,8 @@ function sortPoints(pts) {
     let bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
     return [top[0], top[1], bottom[1], bottom[0]];
 }
-
-// UPDATED: Now extracts 7x7 grid
 function extractBitGrid(warpedMat) {
-    let grid = [];
-    let side = 300;
-    // Dynamic cell calculation based on GRID_SIZE (7)
-    let cell = side / (GRID_SIZE + 2); 
-    
+    let grid = []; let side = 300; let cell = side / (GRID_SIZE + 2); 
     for (let row = 0; row < GRID_SIZE; row++) {
         let gridRow = [];
         for (let col = 0; col < GRID_SIZE; col++) {
@@ -472,17 +409,13 @@ function extractBitGrid(warpedMat) {
     }
     return grid;
 }
-
-// UPDATED: Try Decode with Rotations and Mirroring (BigInt)
 function tryDecode(bitGrid) {
     let currentGrid = bitGrid;
-    // 1. Standard Rotations
     for (let rot of [0, 90, 180, 270]) {
         let res = checkMath(currentGrid);
         if (res.valid) return { valid: true, id: res.id, orientation: `Standard ${rot}°` };
         currentGrid = rotateGrid90(currentGrid);
     }
-    // 2. Mirrored Rotations
     let mirrored = mirrorGrid(bitGrid);
     currentGrid = mirrored;
     for (let rot of [0, 90, 180, 270]) {
@@ -492,54 +425,22 @@ function tryDecode(bitGrid) {
     }
     return { valid: false, id: 0 };
 }
-
-// UPDATED: BigInt Math Check with Anchors
 function checkMath(grid) {
-    let payload = 0n;
-    let bitIndex = 0n;
-    
-    // Extract 49 bits into BigInt
+    let payload = 0n; let bitIndex = 0n;
     for (let row = 0; row < GRID_SIZE; row++) {
         for (let col = 0; col < GRID_SIZE; col++) {
-            if (bitIndex < 49n) {
-                if (grid[row][col] === 1) payload |= (1n << bitIndex);
-                bitIndex++;
-            }
+            if (bitIndex < 49n) { if (grid[row][col] === 1) payload |= (1n << bitIndex); bitIndex++; }
         }
     }
-    
-    // UNPACK: 
-    // Bits 0-7: Safety (8)
-    // Bits 8-44: ID (37)
-    // Bits 45-48: Anchors (4)
-    
-    const readSafety = payload & 255n; // 0xFF
-    const readAnchors = (payload >> 45n) & 15n; // 0xF (Top 4 bits)
-    
-    // CHECK 1: Anchors must be 15 (Binary 1111)
+    const readSafety = payload & 255n; 
+    const readAnchors = (payload >> 45n) & 15n;
     if (readAnchors !== 15n) return { valid: false, id: 0 };
-
-    // CHECK 2: Extract ID
     const readId = (payload >> 8n) & ((1n << 37n) - 1n);
-    
-    // CHECK 3: Validate Math
     const calcSafety = readId % 255n;
-
-    if (calcSafety === readSafety && readId > 0n) {
-        return { valid: true, id: Number(readId) }; // Convert back to Number for App logic
-    }
+    if (calcSafety === readSafety && readId > 0n) return { valid: true, id: Number(readId) };
     return { valid: false, id: 0 };
 }
-
-function rotateGrid90(grid) {
-    const N = grid.length;
-    let newGrid = Array.from({ length: N }, () => Array(N).fill(0));
-    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) newGrid[c][N - 1 - r] = grid[r][c];
-    return newGrid;
-}
-
+function rotateGrid90(grid) { const N = grid.length; let newGrid = Array.from({ length: N }, () => Array(N).fill(0)); for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) newGrid[c][N - 1 - r] = grid[r][c]; return newGrid; }
 function mirrorGrid(grid) { return grid.map(row => [...row].reverse()); }
 
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); });
-}
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); }); }

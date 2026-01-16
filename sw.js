@@ -1,5 +1,4 @@
-// --- UPDATE VERSION HERE TO FORCE RELOAD ---
-const CACHE_NAME = 'plx-scanner-v5-locate-fix'; 
+const CACHE_NAME = 'plx-scanner-v7-no-dropdown'; 
 
 const ASSETS = [
     './',
@@ -11,36 +10,18 @@ const ASSETS = [
     'https://docs.opencv.org/4.5.0/opencv.js'
 ];
 
-// Install Event
 self.addEventListener('install', (e) => {
     self.skipWaiting();
-    e.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(ASSETS);
-        })
-    );
+    e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
 });
 
-// Activate Event
 self.addEventListener('activate', (e) => {
-    e.waitUntil(
-        caches.keys().then((keyList) => {
-            return Promise.all(keyList.map((key) => {
-                if (key !== CACHE_NAME) {
-                    console.log('[ServiceWorker] Removing old cache', key);
-                    return caches.delete(key);
-                }
-            }));
-        })
-    );
+    e.waitUntil(caches.keys().then((keyList) => Promise.all(keyList.map((key) => {
+        if (key !== CACHE_NAME) return caches.delete(key);
+    }))));
     return self.clients.claim();
 });
 
-// Fetch Event
 self.addEventListener('fetch', (e) => {
-    e.respondWith(
-        caches.match(e.request).then((response) => {
-            return response || fetch(e.request);
-        })
-    );
+    e.respondWith(caches.match(e.request).then((response) => response || fetch(e.request)));
 });
