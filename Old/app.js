@@ -1,5 +1,5 @@
 // --- CONFIGURATION ---
-const GRID_SIZE = 7; // UPDATED TO 7x7
+const GRID_SIZE = 6;
 const THRESH_VAL = 100;
 let isScanning = false;
 let videoStream = null;
@@ -16,12 +16,10 @@ const nextPlxDisplay = document.getElementById('next-plx-display');
 const generateBtn = document.getElementById('generate-btn');
 const regStatus = document.getElementById('reg-status');
 
-// Tag Generation Elements
 const tagPreviewArea = document.getElementById('tag-preview-area');
 const tagCanvas = document.getElementById('tag-canvas');
 const printBtn = document.getElementById('print-btn');
 
-// Search Elements
 const searchInput = document.getElementById('search-vin');
 const searchBtn = document.getElementById('search-btn'); 
 const clearSearchBtn = document.getElementById('clear-search-btn');
@@ -130,41 +128,30 @@ generateBtn.addEventListener('click', async () => {
     }
 });
 
-// --- TAG GENERATOR (UPDATED FOR 7x7 + ANCHORS) ---
+// --- TAG GENERATOR (SHARED) ---
 function drawPLXTag(id, canvasElement) {
     const ctx = canvasElement.getContext('2d');
     const size = 300;
-    const gridSize = 7; // 7x7
+    const gridSize = 6;
     const border = 50; 
     const cell = (size - (border * 2)) / gridSize;
 
-    // Clear Canvas
     ctx.fillStyle = "white";
     ctx.fillRect(0,0,size,size);
 
-    // 1. Math Logic (Using BigInt for 49 bits)
-    const idBig = BigInt(id);
-    const safety = idBig % 255n;
-    const anchors = 15n; // Binary 1111 (Decimal 15)
-    
-    // Payload: [ANCHORS (4)] + [ID (37)] + [SAFETY (8)]
-    // Total 49 bits
-    const payload = (anchors << 45n) | (idBig << 8n) | safety;
+    const safety = id % 255;
+    const payload = (id * 256) + safety;
 
-    // 2. Draw Black Background
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, size, size);
 
-    // 3. Draw White Dots
     ctx.fillStyle = "white";
-    let bitIndex = 0n;
-    
+    let bitIndex = 0;
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
-            if (bitIndex < 49n) {
-                // Check bit
-                const bit = (payload >> bitIndex) & 1n;
-                if (bit === 1n) {
+            if (bitIndex < 32) {
+                const bit = Math.floor(payload / Math.pow(2, bitIndex)) % 2;
+                if (bit === 1) {
                     ctx.fillRect(border + (col * cell), border + (row * cell), cell, cell);
                 }
             }
@@ -172,7 +159,6 @@ function drawPLXTag(id, canvasElement) {
         }
     }
     
-    // ID Text
     ctx.font = "bold 40px Arial";
     ctx.fillStyle = "white";
     ctx.textAlign = "center";
@@ -217,6 +203,7 @@ if(printBtn) {
 
 // --- TAB 3: SEARCH LOGIC ---
 
+// 1. Clear Button Logic
 clearSearchBtn.addEventListener('click', () => {
     searchInput.value = '';
     resultBox.classList.add('hidden');
@@ -226,6 +213,7 @@ clearSearchBtn.addEventListener('click', () => {
     locateBtn.style.display = 'none';
 });
 
+// 2. Search Logic ("FIND" Button)
 searchBtn.addEventListener('click', async () => {
     const vinQuery = searchInput.value.trim();
     const activeCustomer = customerSelect.value; 
@@ -236,6 +224,7 @@ searchBtn.addEventListener('click', async () => {
     reprintBtn.style.display = 'none';
     locateBtn.style.display = 'none';
 
+    // Strict Customer Filter
     const { data, error } = await supabaseClient
         .from('vehicle_assets') 
         .select('*')
@@ -255,7 +244,7 @@ searchBtn.addEventListener('click', async () => {
         const timeString = asset.updated_at ? new Date(asset.updated_at).toLocaleString() : "Never Scanned";
         document.getElementById('res-time').innerText = timeString;
         
-        // --- LOCATE BUTTON ---
+        // --- LOCATE BUTTON (Corrected URL) ---
         locateBtn.style.display = 'block'; 
         locateBtn.style.backgroundColor = '#2979ff'; 
         locateBtn.style.color = '#ffffff';
@@ -264,6 +253,7 @@ searchBtn.addEventListener('click', async () => {
             locateBtn.style.opacity = "1";
             locateBtn.innerText = "LOCATE (OPEN MAPS)";
             locateBtn.onclick = function() {
+                // FIXED: Using standard Google Maps URL format
                 const url = `https://www.google.com/maps?q=${asset.latitude},${asset.longitude}`;
                 window.open(url, '_blank');
             };
@@ -453,14 +443,10 @@ function sortPoints(pts) {
     let bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
     return [top[0], top[1], bottom[1], bottom[0]];
 }
-
-// UPDATED: Now extracts 7x7 grid
 function extractBitGrid(warpedMat) {
     let grid = [];
     let side = 300;
-    // Dynamic cell calculation based on GRID_SIZE (7)
     let cell = side / (GRID_SIZE + 2); 
-    
     for (let row = 0; row < GRID_SIZE; row++) {
         let gridRow = [];
         for (let col = 0; col < GRID_SIZE; col++) {
@@ -472,17 +458,13 @@ function extractBitGrid(warpedMat) {
     }
     return grid;
 }
-
-// UPDATED: Try Decode with Rotations and Mirroring (BigInt)
 function tryDecode(bitGrid) {
     let currentGrid = bitGrid;
-    // 1. Standard Rotations
     for (let rot of [0, 90, 180, 270]) {
         let res = checkMath(currentGrid);
         if (res.valid) return { valid: true, id: res.id, orientation: `Standard ${rot}°` };
         currentGrid = rotateGrid90(currentGrid);
     }
-    // 2. Mirrored Rotations
     let mirrored = mirrorGrid(bitGrid);
     currentGrid = mirrored;
     for (let rot of [0, 90, 180, 270]) {
@@ -492,52 +474,27 @@ function tryDecode(bitGrid) {
     }
     return { valid: false, id: 0 };
 }
-
-// UPDATED: BigInt Math Check with Anchors
 function checkMath(grid) {
-    let payload = 0n;
-    let bitIndex = 0n;
-    
-    // Extract 49 bits into BigInt
+    let payload = 0;
+    let bitIndex = 0;
     for (let row = 0; row < GRID_SIZE; row++) {
         for (let col = 0; col < GRID_SIZE; col++) {
-            if (bitIndex < 49n) {
-                if (grid[row][col] === 1) payload |= (1n << bitIndex);
-                bitIndex++;
-            }
+            if (bitIndex >= 32) break;
+            if (grid[row][col] === 1) payload += Math.pow(2, bitIndex);
+            bitIndex++;
         }
     }
-    
-    // UNPACK: 
-    // Bits 0-7: Safety (8)
-    // Bits 8-44: ID (37)
-    // Bits 45-48: Anchors (4)
-    
-    const readSafety = payload & 255n; // 0xFF
-    const readAnchors = (payload >> 45n) & 15n; // 0xF (Top 4 bits)
-    
-    // CHECK 1: Anchors must be 15 (Binary 1111)
-    if (readAnchors !== 15n) return { valid: false, id: 0 };
-
-    // CHECK 2: Extract ID
-    const readId = (payload >> 8n) & ((1n << 37n) - 1n);
-    
-    // CHECK 3: Validate Math
-    const calcSafety = readId % 255n;
-
-    if (calcSafety === readSafety && readId > 0n) {
-        return { valid: true, id: Number(readId) }; // Convert back to Number for App logic
-    }
+    let read_id = Math.floor(payload / 256);
+    let read_safety = payload % 256;
+    if ((read_id % 255) === read_safety && read_id > 0) return { valid: true, id: read_id };
     return { valid: false, id: 0 };
 }
-
 function rotateGrid90(grid) {
     const N = grid.length;
     let newGrid = Array.from({ length: N }, () => Array(N).fill(0));
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) newGrid[c][N - 1 - r] = grid[r][c];
     return newGrid;
 }
-
 function mirrorGrid(grid) { return grid.map(row => [...row].reverse()); }
 
 if ('serviceWorker' in navigator) {
