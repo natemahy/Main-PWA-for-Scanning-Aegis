@@ -15,7 +15,7 @@ body {
     margin: 0;
     display: flex;
     flex-direction: column;
-    height: 100dvh;
+    height: 100dvh; /* Dynamic viewport height for mobile */
     overflow: hidden; /* Prevent scrolling */
 }
 
@@ -54,6 +54,8 @@ main {
     flex-direction: column;
     padding: 15px;
     gap: 15px;
+    /* IMPORTANT: Extra padding at bottom so the map isn't covered by the fixed button */
+    padding-bottom: 110px; 
 }
 
 /* Camera Scanner */
@@ -135,14 +137,21 @@ main {
     transition: top 0.2s linear, left 0.2s linear; /* Smooth movement */
 }
 
-/* Footer Button */
+/* Footer Button - FIXED POSITIONING FIX */
 footer {
-    padding: 20px;
-    background: var(--card-bg);
+    position: fixed; /* Force it to float on top of screen */
+    bottom: 0;
+    left: 0;
+    width: 100%;
     
-    /* ADD THESE LINES: */
+    background: var(--card-bg);
+    padding: 20px;
+    /* Safe area calculation for iPhone home bar */
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
-    flex-shrink: 0; /* Prevents the footer from being squished */
+    
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.5); /* Drop shadow to separate from content */
+    z-index: 1000; /* Ensure it stays on top */
+    box-sizing: border-box; /* Prevents padding from breaking width */
 }
 
 button {
