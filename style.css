@@ -15,7 +15,7 @@ body {
     margin: 0;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100dvh;
     overflow: hidden; /* Prevent scrolling */
 }
 
@@ -139,6 +139,10 @@ main {
 footer {
     padding: 20px;
     background: var(--card-bg);
+    
+    /* ADD THESE LINES: */
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    flex-shrink: 0; /* Prevents the footer from being squished */
 }
 
 button {
