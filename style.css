@@ -1,174 +1,160 @@
 :root {
-    --bg-color: #121212; /* Back to Black */
-    --surface-color: #1e1e1e;
-    --primary-color: #bb86fc;
-    --secondary-color: #03dac6;
-    --text-color: #ffffff;
-    --subtext-color: #a0a0a0;
-}
-
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    -webkit-tap-highlight-color: transparent;
+    --bg-dark: #0f172a;      /* Deep Navy Background */
+    --card-bg: #1e293b;      /* Lighter Navy for Cards */
+    --accent-blue: #3b82f6;  /* Bright Blue for Actions */
+    --text-main: #f1f5f9;    /* Off-white text */
+    --text-muted: #94a3b8;   /* Grey text */
+    --success: #10b981;      /* Green for connected */
+    --warning: #f59e0b;      /* Orange for GPS */
 }
 
 body {
-    background-color: var(--bg-color);
-    color: var(--text-color);
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
     height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    overflow: hidden; /* Prevent scrolling */
 }
 
-.app-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    width: 100%;
-    overflow-y: auto;
-}
-
+/* Header */
 header {
-    position: absolute;
-    top: 0;
-    width: 100%;
-    padding: 20px;
-    text-align: center;
-    background-color: var(--surface-color);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    padding: 15px 20px;
+    background: var(--card-bg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     z-index: 10;
 }
 
-h1 {
-    font-size: 1.2rem;
-    font-weight: 600;
+.logo {
+    font-weight: 800;
     letter-spacing: 1px;
+    color: var(--accent-blue);
 }
 
-/* View Management */
-.view {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    animation: fadeIn 0.3s ease-in-out;
-    padding-bottom: 80px;
-    padding-top: 80px;
-}
-
-.view.active {
-    display: flex;
-}
-
-/* Typography & Elements */
-.instruction-text {
-    color: var(--subtext-color);
-    margin-bottom: 40px;
-    text-align: center;
-}
-
-.primary-btn {
-    background-color: var(--primary-color);
-    color: #000;
-    border: none;
-    padding: 16px 32px;
-    border-radius: 50px;
-    font-size: 1.1rem;
+.badge {
+    padding: 5px 10px;
+    border-radius: 12px;
+    font-size: 12px;
     font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(187, 134, 252, 0.3);
-    transition: transform 0.1s;
-    width: 80%;
-    max-width: 300px;
-    margin-top: 10px;
+    text-transform: uppercase;
 }
 
-.primary-btn:active {
-    transform: scale(0.96);
-}
+.badge.gps { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+.badge.uwb { background: rgba(16, 185, 129, 0.2); color: var(--success); }
 
-.secondary-btn {
-    background: transparent;
-    border: 1px solid var(--subtext-color);
-    color: var(--subtext-color);
-    padding: 12px 24px;
-    border-radius: 50px;
-    margin-top: 20px;
-    cursor: pointer;
-}
-
-/* NEW: Search Container Logic (Kept this fix) */
-.search-container {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    margin-bottom: 20px;
-}
-
-.search-input {
+/* Main Layout */
+main {
     flex: 1;
-    margin-bottom: 0 !important;
+    display: flex;
+    flex-direction: column;
+    padding: 15px;
+    gap: 15px;
 }
 
-.clear-btn {
-    margin-top: 0 !important;
-    padding: 0 20px;
+/* Camera Scanner */
+.scanner-container {
+    flex: 1;
+    background: #000;
+    border-radius: 15px;
+    position: relative;
+    overflow: hidden;
+    border: 2px solid var(--card-bg);
+}
+
+#camera-feed {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+}
+
+.scan-frame {
+    width: 200px;
+    height: 200px;
+    border: 2px solid var(--accent-blue);
+    border-radius: 10px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+}
+
+.overlay p {
+    margin-top: 15px;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+/* UWB Map Area */
+.uwb-container {
+    height: 35%; /* Takes up bottom 35% of screen */
+    background: var(--card-bg);
+    border-radius: 15px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+.uwb-container h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+}
+
+#warehouse-map {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    position: relative;
+    border: 1px dashed var(--text-muted);
+}
+
+#user-dot {
+    width: 12px;
+    height: 12px;
+    background: var(--accent-blue);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%; left: 50%; /* Start center */
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 10px var(--accent-blue);
+    transition: top 0.2s linear, left 0.2s linear; /* Smooth movement */
+}
+
+/* Footer Button */
+footer {
+    padding: 20px;
+    background: var(--card-bg);
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    background: var(--accent-blue);
+    border: none;
+    border-radius: 10px;
+    color: white;
     font-weight: bold;
-    height: 53px;
-    border-color: #ff5555;
-    color: #ff5555;
+    font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 10px;
+    cursor: pointer;
 }
 
-/* Inputs & Dropdowns */
-.customer-dropdown {
-    background: #333; color: white; border: none; padding: 10px; border-radius: 8px; font-size: 1rem; margin-top: 5px; width: 100%; max-width: 200px; text-align: center;
-}
-.input-field {
-    background: #1e1e1e; border: 1px solid #444; color: white; padding: 15px; width: 100%; border-radius: 8px; margin-bottom: 20px; font-size: 1.1rem;
-}
-.info-box {
-    background: #2a2a2a; padding: 20px; border-radius: 12px; margin-bottom: 20px; width: 100%; text-align: center;
-}
-.info-box h1 { font-size: 3rem; color: #bb86fc; margin: 10px 0; }
-
-/* Bottom Navigation */
-.bottom-nav {
-    position: fixed; bottom: 0; left: 0; width: 100%; background: #1e1e1e; display: flex; justify-content: space-around; padding: 15px 0; border-top: 1px solid #333; z-index: 100; padding-bottom: max(15px, env(safe-area-inset-bottom));
-}
-.nav-btn {
-    background: none; border: none; color: #888; font-size: 1rem; font-weight: bold; cursor: pointer;
-}
-.nav-btn.active { color: #bb86fc; }
-
-/* Search Results */
-.result-box {
-    background: #222; padding: 20px; border-radius: 10px; margin-top: 20px; text-align: left; width: 100%;
-}
-.map-link {
-    display: block; background: #03dac6; color: black; text-align: center; padding: 10px; border-radius: 5px; margin-top: 15px; text-decoration: none; font-weight: bold;
-}
-.scan-overlay {
-    position: absolute; bottom: 80px; left: 20px; right: 20px; background: rgba(0,0,0,0.9); padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #bb86fc; z-index: 50;
-}
-
-/* Scanning Placeholder */
-.video-container {
-    width: 100%; max-width: 350px; height: 350px; background-color: #000; border-radius: 20px; display: flex; align-items: center; justify-content: center; position: relative; border: 2px solid var(--surface-color); margin-bottom: 20px; overflow: hidden;
-}
-
-/* Utility - Kept the safer version */
-.hidden { 
-    display: none; 
-}
+button:active { opacity: 0.9; }

@@ -6,90 +6,51 @@
     <title>PLX Fleet Manager</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#121212">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    
-    <link rel="apple-touch-icon" href="icon-192.png">
-    
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script async src="https://docs.opencv.org/4.5.0/opencv.js" type="text/javascript"></script>
+    <meta name="theme-color" content="#1a1a2e">
 </head>
 <body>
 
-    <div class="app-container">
-        
-        <div id="tab-register" class="view">
-            <h2>Register New Asset</h2>
+    <header>
+        <div class="logo">PLX TRACKER</div>
+        <div id="status-badge" class="badge gps">GPS MODE</div>
+    </header>
 
-            <div style="width: 100%; margin-bottom: 20px; text-align: left;">
-                <label for="customer-select" style="font-size: 0.9rem; color: #a0a0a0; display: block; margin-bottom: 5px;">Select Customer:</label>
-                <select id="customer-select" class="customer-dropdown" style="width: 100%; max-width: 100%; padding: 15px; background: #333; color: white; border: 1px solid #444; border-radius: 8px; font-size: 1.1rem;">
-                    <option>Loading...</option>
-                </select>
-            </div>
-
-            <input type="text" id="vin-input" placeholder="Enter Full VIN" class="input-field">
-            
-            <div class="info-box">
-                <p>Next PLX ID:</p>
-                <h1 id="next-plx-display">--</h1>
-            </div>
-
-            <button id="generate-btn" class="primary-btn">Generate & Save</button>
-            <p id="reg-status" class="status-text"></p>
-
-            <div id="tag-preview-area" class="hidden" style="margin-top:20px; text-align:center;">
-                <p style="color:#aaa; margin-bottom:10px;">Tag Generated:</p>
-                <canvas id="tag-canvas" width="300" height="300" style="width:150px; height:150px; border:1px solid #444; background: white;"></canvas>
-                <br>
-                <button id="print-btn" class="secondary-btn" style="margin-top:10px;">Print Label</button>
+    <main>
+        <div class="scanner-container">
+            <video id="camera-feed" autoplay playsinline></video>
+            <div class="overlay">
+                <div class="scan-frame"></div>
+                <p>Align PLX Tag in Frame</p>
             </div>
         </div>
 
-        <div id="tab-scan" class="view active">
-            <p class="instruction-text">Scan any tag to update location.</p>
-            
-            <div class="video-container">
-            </div> 
-            
-            <button id="scan-btn" class="primary-btn">Start Scanner</button>
-            
-            <div id="scan-result" class="scan-overlay hidden">
-                <h3>Scan Success</h3>
-                <p id="scan-msg">Updating...</p>
-                <button id="scan-again-btn" class="secondary-btn">Scan Next</button>
+        <div class="uwb-container">
+            <h3>Facility Position <span id="coords-display">(Waiting...)</span></h3>
+            <div id="warehouse-map">
+                <div id="user-dot"></div>
             </div>
         </div>
+    </main>
 
-        <div id="tab-search" class="view">
-            <h2>Find Asset</h2>
-            
-            <div class="search-container">
-                <input type="text" id="search-vin" placeholder="Last 8 of VIN" class="input-field search-input">
-                <button id="clear-search-btn" class="secondary-btn clear-btn">X</button>
-            </div>
-
-            <button id="search-btn" class="primary-btn">FIND</button>
-            
-            <div id="search-results" class="result-box hidden">
-                <p><strong>PLX ID:</strong> <span id="res-id">--</span></p>
-                <p><strong>Customer:</strong> <span id="res-cust">--</span></p>
-                <p><strong>Last Seen:</strong> <span id="res-time">--</span></p>
-                
-                <button id="locate-btn" class="primary-btn" style="display:none; width: 100%; background-color: #03dac6; color: #000; margin-top: 20px; font-weight: bold;">LOCATE</button>
-                
-                <button id="reprint-btn" class="secondary-btn" style="display:none; width: 100%; border-color: #bb86fc; color: #bb86fc; margin-top: 15px;">Reprint Tag</button>
-            </div>
-        </div>
-
-        <nav class="bottom-nav">
-            <button class="nav-btn active" onclick="switchTab('tab-scan')">Scan</button>
-            <button class="nav-btn" onclick="switchTab('tab-register')">Register</button>
-            <button class="nav-btn" onclick="switchTab('tab-search')">Search</button>
-        </nav>
-
-    </div>
+    <footer>
+        <button id="btn-connect" onclick="connectToUWB()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                <path d="M1.42 9a16 16 0 0 1 16 0"></path>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                <line x1="12" y1="20" x2="12" y2="20"></line>
+            </svg>
+            Connect UWB Tool
+        </button>
+    </footer>
 
     <script src="app.js"></script>
+    <script>
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+            .then(() => console.log('Service Worker Registered'));
+        }
+    </script>
 </body>
 </html>
