@@ -1,119 +1,149 @@
 // --- CONFIGURATION ---
+const API_URL = "https://your-server.com/api/save-asset-location";
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-// --- STATE VARIABLES ---
-let uwbDevice = null;
-let useUWB = false; 
+// --- STATE ---
+let mode = "WAREHOUSE"; // or "YARD"
+let uwbRanges = {}; 
+let lastScanTime = 0;
 
-// This object holds the latest distance from each anchor
-// Example: { "2910": 4.5, "1822": 10.2 }
-let anchorDistances = {}; 
+// --- 1. UI TOGGLE ---
+function toggleMode() {
+    const label = document.getElementById('mode-label');
+    const icon = document.getElementById('mode-icon');
+    const badge = document.getElementById('status-badge'); // Reuse header badge if needed
 
-// --- CAMERA SETUP (Auto-starts) ---
+    if (mode === "WAREHOUSE") {
+        mode = "YARD";
+        label.innerText = "YARD (GPS)";
+        icon.innerText = "🚜";
+        // Start GPS Watcher
+        startGPS();
+    } else {
+        mode = "WAREHOUSE";
+        label.innerText = "WAREHOUSE";
+        icon.innerText = "🏭";
+        // GPS stops automatically (we just ignore it)
+    }
+    log(`Switched to ${mode} mode`);
+}
+
+// --- 2. THE LOOP (Vision + Location) ---
 async function startCamera() {
+    const video = document.getElementById('camera-feed');
+    const canvas = document.getElementById('overlay-canvas');
+    
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "environment" } // Use back camera
+            video: { facingMode: "environment" } 
         });
-        document.getElementById('camera-feed').srcObject = stream;
+        video.srcObject = stream;
+        
+        // Start Scanning Loop (Every 200ms)
+        setInterval(() => {
+            const detectedID = scanFrameForPLX(video, canvas); // Calls plx-reader.js
+            
+            if (detectedID && (Date.now() - lastScanTime > 3000)) {
+                // Found a tag! And 3 second cooldown passed
+                handleTagFound(detectedID);
+                lastScanTime = Date.now();
+            }
+        }, 200);
+
     } catch (err) {
         console.error("Camera Error:", err);
     }
 }
-startCamera(); // Run on load
+startCamera();
 
-// --- BLE CONNECTION LOGIC ---
-async function connectToUWB() {
-    try {
-        console.log('Scanning for PLX Handheld...');
-        
-        uwbDevice = await navigator.bluetooth.requestDevice({
-            filters: [{ name: 'PLX_Handheld' }], 
-            optionalServices: [SERVICE_UUID]
-        });
-
-        const server = await uwbDevice.gatt.connect();
-        const service = await server.getPrimaryService(SERVICE_UUID);
-        const characteristic = await service.getCharacteristic(CHAR_UUID);
-
-        await characteristic.startNotifications();
-        characteristic.addEventListener('characteristicvaluechanged', handleRawData);
-
-        // Update UI
-        useUWB = true;
-        document.getElementById('status-badge').innerText = "UWB CONNECTED";
-        document.getElementById('status-badge').className = "badge uwb";
-        document.getElementById('btn-connect').innerText = "Connected";
-        document.getElementById('btn-connect').disabled = true;
-
-        // Start the Position Calculation Loop
-        startPositionLoop();
-
-    } catch (error) {
-        console.error('Connection failed!', error);
-        alert('Connection Failed. If on iOS, make sure you are using Bluefy Browser.');
+// --- 3. DATA HANDLING ---
+function handleTagFound(tagID) {
+    log(`✅ PLX FOUND: ${tagID}`);
+    
+    let locationData = {};
+    
+    if (mode === "WAREHOUSE") {
+        // Validation: Do we have UWB data?
+        if (Object.keys(uwbRanges).length === 0) {
+            alert("Warning: No UWB Anchors detected!");
+            return; 
+        }
+        locationData = {
+            type: "UWB",
+            ranges: { ...uwbRanges } // Copy current ranges
+        };
+    } 
+    else if (mode === "YARD") {
+        // Validation: Do we have GPS?
+        if (!currentGPS.lat) {
+            alert("Waiting for GPS Signal...");
+            return;
+        }
+        locationData = {
+            type: "GPS",
+            lat: currentGPS.lat,
+            lng: currentGPS.lng,
+            acc: currentGPS.acc
+        };
     }
+
+    sendToServer(tagID, locationData);
 }
 
-// --- DATA HANDLING ---
-// 1. Receive Raw Data Packet from ESP32
-function handleRawData(event) {
-    const value = event.target.value;
-    const decoder = new TextDecoder('utf-8');
-    const jsonString = decoder.decode(value);
+async function sendToServer(tagID, locData) {
+    const payload = {
+        plx_id: tagID,
+        timestamp: Date.now(),
+        mode: mode,
+        location: locData
+    };
+
+    log(`Sending ${tagID} to DB...`);
     
     try {
-        const data = JSON.parse(jsonString);
-        // data.id = Anchor ID (e.g., 255)
-        // data.d = Distance in meters
+        // Replace with your real fetch
+        // await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) ... });
         
-        // Update the dictionary with the NEWEST distance for this specific anchor
-        anchorDistances[data.id] = data.d;
+        console.log("PAYLOAD SENT:", JSON.stringify(payload, null, 2));
+        log(`Saved ${tagID} successfully.`);
         
     } catch (e) {
-        // Ignore partial packets
+        log("Upload Failed.");
     }
 }
 
-// --- POSITIONING LOOP (The Smoothing Logic) ---
-// We calculate position every 200ms, using whatever the latest data is.
-// This prevents the dot from jittering on every single incoming packet.
+// --- 4. GPS LOGIC ---
+let currentGPS = { lat: null, lng: null, acc: null };
 
-function startPositionLoop() {
-    setInterval(() => {
-        // Check if we have enough data (at least 3 anchors)
-        // In a real scenario, you might fallback to 2 anchors with assumptions
-        const keys = Object.keys(anchorDistances);
-        
-        if (keys.length >= 3) {
-            // Extract the distances
-            // NOTE: You need to map these IDs to your real Anchors (A, B, C)
-            const d1 = anchorDistances[keys[0]]; 
-            const d2 = anchorDistances[keys[1]]; 
-            const d3 = anchorDistances[keys[2]];
-
-            // >>> CALL YOUR TRILATERATION FUNCTION HERE <<<
-            // const position = calculatePosition(d1, d2, d3);
+function startGPS() {
+    if ("geolocation" in navigator) {
+        navigator.geolocation.watchPosition((pos) => {
+            currentGPS.lat = pos.coords.latitude;
+            currentGPS.lng = pos.coords.longitude;
+            currentGPS.acc = pos.coords.accuracy;
             
-            // For now, let's simulate movement for visual confirmation
-            // REPLACE THIS with your actual x,y result
-            const simulatedX = 50 + (Math.random() * 5); 
-            const simulatedY = 50 + (Math.random() * 5);
-            
-            updateMapDot(simulatedX, simulatedY);
-            
-            document.getElementById('coords-display').innerText = 
-                `X: ${simulatedX.toFixed(1)}m | Y: ${simulatedY.toFixed(1)}m`;
-        }
-    }, 200); // 5 times a second
+            if(mode === "YARD") {
+                document.getElementById('coords-display').innerText = 
+                    `GPS Acc: ${Math.round(pos.coords.accuracy)}m`;
+            }
+        }, (err) => {
+            console.error("GPS Error", err);
+        }, {
+            enableHighAccuracy: true,
+            maximumAge: 0
+        });
+    }
 }
 
-// Update the dot on the screen
-function updateMapDot(x, y) {
-    const dot = document.getElementById('user-dot');
-    // Map your Warehouse Meters to CSS Percentages (0-100%)
-    // Example: If warehouse is 100m wide, x is effectively %
-    dot.style.left = x + '%'; 
-    dot.style.top = y + '%';
+// --- 5. UWB LOGIC (Existing) ---
+// (Keep your connectToUWB function from before here)
+// Just ensure it updates the global `uwbRanges` variable.
+
+// --- Helper ---
+function log(msg) {
+    const feed = document.getElementById('log-feed');
+    const div = document.createElement('div');
+    div.innerText = `> ${msg}`;
+    feed.insertBefore(div, feed.firstChild);
 }
