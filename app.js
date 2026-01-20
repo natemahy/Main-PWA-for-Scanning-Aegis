@@ -17,13 +17,13 @@ window.enableVision = function() {
     log("Vision System Activated");
 };
 
-// --- 2. CAMERA LOOP (With Safari Resolution Fix) ---
+// --- 2. CAMERA LOOP (With Zoom Fix) ---
 async function startCamera() {
     const video = document.getElementById('camera-feed');
     const canvas = document.getElementById('overlay-canvas');
     
     try {
-        // Request High Resolution for clearer scanning
+        // Request High Resolution
         const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
                 facingMode: "environment",
@@ -33,18 +33,20 @@ async function startCamera() {
         });
         video.srcObject = stream;
         
-        // FIX: Wait for video to load metadata to get real size
+        // FIX: Wait for video metadata
         video.onloadedmetadata = () => {
             video.play();
             
-            // Force HTML to match internal stream resolution
-            // This is required for OpenCV to read pixels correctly
+            // 1. Sync Resolution
             video.width = video.videoWidth;
             video.height = video.videoHeight;
-            
-            // Sync Canvas to match
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+            
+            // 2. FORCE "CONTAIN" STYLE (The Fail-Safe)
+            // This forces the full video to be visible, adding black bars if needed.
+            video.style.objectFit = "contain";
+            canvas.style.objectFit = "contain";
             
             log(`Camera Active: ${video.videoWidth}x${video.videoHeight}`);
         };
@@ -64,9 +66,9 @@ async function startCamera() {
                     }
                 }
             } catch (err) {
-                // Prevent loop crash on error
+                // Prevent loop crash
             }
-        }, 100); // 100ms = Fast scanning
+        }, 100); 
 
     } catch (err) {
         console.error("Camera Error:", err);

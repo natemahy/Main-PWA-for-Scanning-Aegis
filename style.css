@@ -1,11 +1,11 @@
 :root {
-    --bg-dark: #0f172a;      /* Deep Navy Background */
-    --card-bg: #1e293b;      /* Lighter Navy for Cards */
-    --accent-blue: #3b82f6;  /* Bright Blue for Actions */
-    --text-main: #f1f5f9;    /* Off-white text */
-    --text-muted: #94a3b8;   /* Grey text */
-    --success: #10b981;      /* Green for connected */
-    --warning: #f59e0b;      /* Orange for GPS */
+    --bg-dark: #0f172a;      /* Deep Navy */
+    --card-bg: #1e293b;      /* Lighter Navy */
+    --accent-blue: #3b82f6;  /* Bright Blue */
+    --text-main: #f1f5f9;    /* Off-white */
+    --text-muted: #94a3b8;   /* Grey */
+    --success: #10b981;      /* Green */
+    --warning: #f59e0b;      /* Orange */
 }
 
 body {
@@ -15,11 +15,11 @@ body {
     margin: 0;
     display: flex;
     flex-direction: column;
-    height: 100dvh; /* Dynamic viewport height for mobile */
-    overflow: hidden; /* Prevent scrolling */
+    height: 100dvh; /* Dynamic Viewport Height */
+    overflow: hidden;
 }
 
-/* Header */
+/* HEADER */
 header {
     padding: 15px 20px;
     background: var(--card-bg);
@@ -36,142 +36,7 @@ header {
     color: var(--accent-blue);
 }
 
-.badge {
-    padding: 5px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: bold;
-    text-transform: uppercase;
-}
-
-.badge.gps { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-.badge.uwb { background: rgba(16, 185, 129, 0.2); color: var(--success); }
-
-/* Main Layout */
-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 15px;
-    gap: 15px;
-    /* IMPORTANT: Extra padding at bottom so the map isn't covered by the fixed button */
-    padding-bottom: 110px; 
-}
-
-/* Camera Scanner */
-.scanner-container {
-    flex: 1;
-    background: #000;
-    border-radius: 15px;
-    position: relative;
-    overflow: hidden;
-    border: 2px solid var(--card-bg);
-}
-
-#camera-feed {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.overlay {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    pointer-events: none;
-}
-
-.scan-frame {
-    width: 200px;
-    height: 200px;
-    border: 2px solid var(--accent-blue);
-    border-radius: 10px;
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-}
-
-.overlay p {
-    margin-top: 15px;
-    font-size: 14px;
-    color: var(--text-muted);
-}
-
-/* UWB Map Area */
-.uwb-container {
-    height: 35%; /* Takes up bottom 35% of screen */
-    background: var(--card-bg);
-    border-radius: 15px;
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
-}
-
-.uwb-container h3 {
-    margin: 0 0 10px 0;
-    font-size: 14px;
-    color: var(--text-muted);
-    display: flex;
-    justify-content: space-between;
-}
-
-#warehouse-map {
-    flex: 1;
-    background: rgba(255,255,255,0.05);
-    border-radius: 8px;
-    position: relative;
-    border: 1px dashed var(--text-muted);
-}
-
-#user-dot {
-    width: 12px;
-    height: 12px;
-    background: var(--accent-blue);
-    border: 2px solid #fff;
-    border-radius: 50%;
-    position: absolute;
-    top: 50%; left: 50%; /* Start center */
-    transform: translate(-50%, -50%);
-    box-shadow: 0 0 10px var(--accent-blue);
-    transition: top 0.2s linear, left 0.2s linear; /* Smooth movement */
-}
-
-/* Footer Button - FIXED POSITIONING FIX */
-footer {
-    position: fixed; /* Force it to float on top of screen */
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    
-    background: var(--card-bg);
-    padding: 20px;
-    /* Safe area calculation for iPhone home bar */
-    padding-bottom: calc(20px + env(safe-area-inset-bottom));
-    
-    box-shadow: 0 -4px 10px rgba(0,0,0,0.5); /* Drop shadow to separate from content */
-    z-index: 1000; /* Ensure it stays on top */
-    box-sizing: border-box; /* Prevents padding from breaking width */
-}
-
-button {
-    width: 100%;
-    padding: 15px;
-    background: var(--accent-blue);
-    border: none;
-    border-radius: 10px;
-    color: white;
-    font-weight: bold;
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    cursor: pointer;
-}
-
-button:active { opacity: 0.9; }
-/* Add this to style.css */
+/* TOGGLE SWITCH */
 .toggle-container {
     background: rgba(255,255,255,0.1);
     border: 1px solid var(--accent-blue);
@@ -183,47 +48,117 @@ button:active { opacity: 0.9; }
     cursor: pointer;
     transition: background 0.2s;
 }
+.toggle-container:active { background: var(--accent-blue); }
+#mode-label { font-size: 12px; font-weight: bold; }
 
-.toggle-container:active {
+/* MAIN LAYOUT */
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 15px;
+    gap: 15px;
+    padding-bottom: 90px; /* Space for footer */
+}
+
+/* CAMERA SCANNER */
+.scanner-container {
+    flex: 1;
+    background: #000;
+    border-radius: 15px;
+    position: relative;
+    overflow: hidden;
+    border: 2px solid var(--card-bg);
+    
+    /* Center the video if there are black bars */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#camera-feed {
+    width: 100%;
+    height: 100%;
+    /* 'contain' ensures we see the FULL video frame (no cropping) */
+    object-fit: contain; 
+}
+
+#overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* Ensure the canvas aligns perfectly with the video */
+    object-fit: contain; 
+    pointer-events: none;
+}
+
+.overlay-text {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    text-align: center;
+    pointer-events: none;
+    z-index: 20;
+}
+
+/* LOG CONTAINER */
+.uwb-container {
+    height: 30%;
+    background: var(--card-bg);
+    border-radius: 15px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+}
+.uwb-container h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+}
+
+/* FOOTER */
+footer {
+    position: fixed;
+    bottom: 0; left: 0; width: 100%;
+    background: var(--card-bg);
+    padding: 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    z-index: 100;
+    box-sizing: border-box;
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.5);
+}
+
+button {
+    width: 100%;
+    padding: 15px;
     background: var(--accent-blue);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
 }
 
-#mode-label {
-    font-size: 12px;
-    font-weight: bold;
-    color: var(--text-main);
-}
-/* --- POPUP MESSAGE --- */
+/* POPUP MESSAGE */
 .scan-popup {
     position: fixed;
-    top: 50%;
-    left: 50%;
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(16, 185, 129, 0.95); /* Bright Green */
+    background: rgba(16, 185, 129, 0.95);
     color: white;
     padding: 20px 40px;
     border-radius: 15px;
     text-align: center;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    z-index: 2000; /* Above everything */
+    z-index: 2000;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;
 }
-
-.scan-popup.visible {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.scan-popup h2 {
-    margin: 0;
-    font-size: 24px;
-    text-transform: uppercase;
-}
-
-.scan-popup p {
-    margin: 5px 0 0 0;
-    font-size: 16px;
-    opacity: 0.9;
-}
+.scan-popup.visible { opacity: 1; pointer-events: auto; }
+.scan-popup h2 { margin: 0; font-size: 24px; text-transform: uppercase; }
