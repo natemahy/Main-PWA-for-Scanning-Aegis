@@ -1,5 +1,4 @@
 // --- CONFIGURATION ---
-// Replace with your real server endpoint
 const API_URL = "https://your-server.com/api/save-asset-location"; 
 
 // UUIDs matching your ESP32 Firmware
@@ -7,18 +6,19 @@ const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
 // --- STATE VARIABLES ---
-let mode = "WAREHOUSE"; // Default mode
-let uwbRanges = {};     // Stores latest UWB distances: { "10": 4.5, "22": 8.1 }
-let lastScanTime = 0;   // Cooldown timer for scanner
-let visionEnabled = false; // Safety Flag: Prevents crash if OpenCV isn't ready
-let currentGPS = { lat: null, lng: null, acc: null }; // Stores latest GPS data
+let mode = "WAREHOUSE"; // Default: WAREHOUSE or YARD
+let uwbRanges = {};     // Stores UWB distances: { "10": 4.5, "22": 8.1 }
+let lastScanTime = 0;   // Cooldown timer
+let visionEnabled = false; // Safety Flag
+let currentGPS = { lat: null, lng: null, acc: null };
+let popupTimeout; // For the popup timer
 
-// --- 1. INITIALIZATION HANDLERS ---
+// --- 1. INITIALIZATION ---
 
 // Called by index.html when OpenCV is fully loaded
 window.enableVision = function() {
     visionEnabled = true;
-    log("Vision System Activated - Ready to Scan");
+    log("Vision System Activated");
 };
 
 // --- 2. CAMERA & VISION LOOP ---
@@ -27,43 +27,44 @@ async function startCamera() {
     const canvas = document.getElementById('overlay-canvas');
     
     try {
+        // Use back camera
         const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { facingMode: "environment" } 
         });
         video.srcObject = stream;
         
-        // SCANNING LOOP (Every 500ms)
+        // SCANNING LOOP (Runs every 200ms)
         setInterval(() => {
-            // CRITICAL SAFETY CHECK: 
-            // Do not attempt to scan if OpenCV is not loaded yet.
+            // SAFETY: Don't run if OpenCV isn't loaded
             if (!visionEnabled) return; 
 
             try {
-                // Ensure plx-reader.js functions exist before calling
+                // Check if plx-reader.js is loaded
                 if (typeof scanFrameForPLX === "function") {
+                    
+                    // >>> THE SCAN <<<
                     const detectedID = scanFrameForPLX(video, canvas); 
                     
-                    // If tag found AND cooldown (3 seconds) has passed
-                    if (detectedID && (Date.now() - lastScanTime > 3000)) {
+                    // If tag found AND 2 seconds have passed since last scan
+                    if (detectedID && (Date.now() - lastScanTime > 2000)) {
                         handleTagFound(detectedID);
                         lastScanTime = Date.now();
                     }
                 }
             } catch (err) {
-                // Silently catch errors to prevent loop crash
-                console.error("Vision Loop Warning:", err);
+                // Silent catch to prevent loop crash
             }
-        }, 500); // 2 FPS is sufficient and saves battery
+        }, 200); 
 
     } catch (err) {
         console.error("Camera Error:", err);
-        log("Camera failed to start. Check permissions.");
+        log("Camera failed. Check Permissions.");
     }
 }
-startCamera(); // Auto-start camera on load
+startCamera(); // Auto-start
 
 // --- 3. MODE TOGGLE LOGIC ---
-window.toggleMode = function() { // Made global so HTML can see it
+window.toggleMode = function() { 
     const label = document.getElementById('mode-label');
     const icon = document.getElementById('mode-icon');
     
@@ -72,93 +73,111 @@ window.toggleMode = function() { // Made global so HTML can see it
         label.innerText = "YARD (GPS)";
         icon.innerText = "🚜";
         startGPS(); // Ensure GPS is watching
-        log("Switched to YARD mode (GPS Active)");
+        log("Switched to YARD mode");
     } else {
         mode = "WAREHOUSE";
         label.innerText = "WAREHOUSE";
         icon.innerText = "🏭";
-        log("Switched to WAREHOUSE mode (UWB Active)");
+        log("Switched to WAREHOUSE mode");
     }
 };
 
 // --- 4. DATA HANDLING (The Brain) ---
 function handleTagFound(tagID) {
-    log(`✅ PLX FOUND: ${tagID}`);
+    // 1. Show Visual Feedback immediately
+    showPopup(tagID);
+    log(`✅ SCANNED: ${tagID}`);
     
     let locationData = {};
     
+    // 2. Attach Location Data based on Mode
     if (mode === "WAREHOUSE") {
-        // Validation: Do we have UWB data?
-        // Note: You might want to allow 0 anchors for testing, 
-        // but for prod, keep this check.
         const anchorCount = Object.keys(uwbRanges).length;
+        
+        // Warning if no UWB connected
         if (anchorCount === 0) {
             log("⚠️ Warning: No UWB Anchors detected!");
-            alert("No UWB Signal! Connect the tool or move closer to anchors.");
-            return; 
         }
+        
         locationData = {
             type: "UWB",
-            anchor_count: anchorCount,
-            ranges: { ...uwbRanges } // Clone the current data
+            ranges: { ...uwbRanges } // Clone data
         };
     } 
     else if (mode === "YARD") {
-        // Validation: Do we have GPS?
         if (!currentGPS.lat) {
             log("⚠️ Waiting for GPS Lock...");
-            alert("Waiting for GPS Signal...");
-            return;
+            // We still send the scan, just without GPS
+            locationData = { type: "GPS_PENDING" };
+        } else {
+            locationData = {
+                type: "GPS",
+                lat: currentGPS.lat,
+                lng: currentGPS.lng,
+                acc: currentGPS.acc
+            };
         }
-        locationData = {
-            type: "GPS",
-            lat: currentGPS.lat,
-            lng: currentGPS.lng,
-            acc: currentGPS.acc
-        };
     }
 
     sendToServer(tagID, locationData);
 }
 
+// --- 5. SERVER UPLOAD ---
 async function sendToServer(tagID, locData) {
     const payload = {
         plx_id: tagID,
         timestamp: Date.now(),
         mode: mode,
         location: locData,
-        device_id: "handheld_scanner_01" // You can make this dynamic later
+        device_id: "handheld_01"
     };
 
-    log(`Sending ${tagID} to Database...`);
+    console.log("UPLOADING:", payload);
     
     try {
-        // --- REAL FETCH CODE (Uncomment when ready) ---
+        // --- REAL FETCH (Uncomment to use) ---
         /*
         const response = await fetch(API_URL, {
              method: "POST",
              headers: { "Content-Type": "application/json" },
              body: JSON.stringify(payload)
         });
-        if (!response.ok) throw new Error("Server rejected data");
         */
         
-        // --- SIMULATION FOR TESTING ---
-        console.log("PAYLOAD SENT:", JSON.stringify(payload, null, 2));
-        
-        // Visual Feedback
-        log(`SUCCESS! Saved ${tagID}.`);
+        // Simulation Success
+        log(`Saved ${tagID} to DB.`);
         
     } catch (e) {
         console.error("Upload Error:", e);
-        log("❌ Upload Failed. Check Network.");
+        log("❌ Upload Failed.");
     }
 }
 
-// --- 5. UWB CONNECTION LOGIC (BLE) ---
+// --- 6. POPUP UI LOGIC ---
+function showPopup(tagID) {
+    const popup = document.getElementById('scan-popup');
+    const text = document.getElementById('popup-text');
+    
+    text.innerText = `Tag: ${tagID} Recorded`;
+    popup.classList.add('visible');
+    
+    // Clear old timer
+    if (popupTimeout) clearTimeout(popupTimeout);
+    
+    // Hide after 2 seconds
+    popupTimeout = setTimeout(() => {
+        hidePopup();
+    }, 2000);
+}
+
+window.hidePopup = function() {
+    document.getElementById('scan-popup').classList.remove('visible');
+}
+
+// --- 7. UWB CONNECTION (BLE) ---
 window.connectToUWB = async function() {
     try {
-        log('Scanning for PLX Handheld...');
+        log('Scanning for Tool...');
         const device = await navigator.bluetooth.requestDevice({
             filters: [{ name: 'PLX_Handheld' }], 
             optionalServices: [SERVICE_UUID]
@@ -173,34 +192,24 @@ window.connectToUWB = async function() {
         characteristic.addEventListener('characteristicvaluechanged', (event) => {
             const value = new TextDecoder().decode(event.target.value);
             try {
-                // Expecting JSON: {"id":10, "d":5.2}
+                // Parse: {"id":10, "d":5.2}
                 const data = JSON.parse(value);
-                
-                // Update Global State
                 uwbRanges[data.id] = data.d;
-                
-                // Update UI (Optional Debug)
-                // console.log(`Anchor ${data.id}: ${data.d}m`);
-                
-            } catch (e) {
-                // Ignore partial/corrupt packets
-            }
+            } catch (e) {}
         });
 
-        // UI Updates on Success
         log("UWB Connected!");
-        document.getElementById('btn-connect').innerText = "Tool Connected";
-        document.getElementById('btn-connect').style.background = "#10b981"; // Green
-        document.getElementById('btn-connect').disabled = true;
+        const btn = document.getElementById('btn-connect');
+        btn.innerText = "Tool Connected";
+        btn.style.background = "#10b981"; // Green
+        btn.disabled = true;
 
     } catch (error) {
-        console.error('Connection failed', error);
-        log("BLE Connection Failed.");
-        alert("Could not connect. Ensure you are using Bluefy (iOS) or Chrome (Android).");
+        log("BLE Failed. Use Bluefy App.");
     }
 };
 
-// --- 6. GPS LOGIC ---
+// --- 8. GPS LOGIC ---
 function startGPS() {
     if ("geolocation" in navigator) {
         navigator.geolocation.watchPosition((pos) => {
@@ -208,22 +217,14 @@ function startGPS() {
             currentGPS.lng = pos.coords.longitude;
             currentGPS.acc = pos.coords.accuracy;
             
-            // Only update display if we are actually in YARD mode
+            // Update UI if in Yard Mode
             if(mode === "YARD") {
                 const display = document.getElementById('coords-display');
-                if(display) {
-                    display.innerText = `GPS Accuracy: ${Math.round(pos.coords.accuracy)}m`;
-                }
+                if(display) display.innerText = `(GPS: ±${Math.round(pos.coords.accuracy)}m)`;
             }
         }, (err) => {
-            console.error("GPS Error", err);
-            log("GPS Error: Enable Location Services.");
-        }, {
-            enableHighAccuracy: true,
-            maximumAge: 0
-        });
-    } else {
-        log("GPS not supported on this device.");
+            log("GPS Error. Check Settings.");
+        }, { enableHighAccuracy: true });
     }
 }
 

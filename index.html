@@ -22,20 +22,30 @@
         <div class="scanner-container">
             <video id="camera-feed" autoplay playsinline muted></video>
             <canvas id="overlay-canvas"></canvas>
+            
             <div class="overlay-text">
                 <div class="scan-frame"></div>
-                <p id="system-status" style="color: yellow;">Initializing...</p>
+                <p id="system-status" style="color: yellow; font-weight: bold;">Initializing Vision...</p>
             </div>
         </div>
 
         <div class="uwb-container">
-            <h3>System Log</h3>
-            <div id="log-feed" style="font-size: 12px; color: #94a3b8; overflow-y: auto; height: 100%;"></div>
+            <h3>System Log <span id="coords-display"></span></h3>
+            <div id="log-feed" style="font-size: 12px; color: #94a3b8; overflow-y: auto; height: 100%;">
+                <div>System booting...</div>
+            </div>
         </div>
     </main>
 
+    <div id="scan-popup" class="scan-popup" onclick="hidePopup()">
+        <h2>Scan Complete</h2>
+        <p id="popup-text">PLX Tag Recorded</p>
+    </div>
+
     <footer>
-        <button id="btn-connect" onclick="connectToUWB()">Connect UWB Tool</button>
+        <button id="btn-connect" onclick="connectToUWB()">
+            Connect UWB Tool
+        </button>
     </footer>
 
     <script src="plx-reader.js"></script>
@@ -44,16 +54,25 @@
     <script async src="https://docs.opencv.org/4.5.4/opencv.js" onload="onOpenCvReady();" onerror="onOpenCvError();"></script>
 
     <script>
-        function onOpenCvReady() {
-            console.log("OpenCV Loaded!");
-            // Tell app.js it is safe to start scanning
-            if(window.enableVision) window.enableVision(); 
-            document.getElementById('system-status').innerText = "Vision Ready - Align Tag";
-            document.getElementById('system-status').style.color = "#10b981"; // Green
+        // Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
         }
+
+        // OpenCV Loading Callbacks
+        function onOpenCvReady() {
+            console.log("OpenCV Library Loaded!");
+            if(window.enableVision) window.enableVision(); 
+            
+            const status = document.getElementById('system-status');
+            status.innerText = "Vision Ready - Align Tag";
+            status.style.color = "#10b981"; // Green
+        }
+
         function onOpenCvError() {
-            document.getElementById('system-status').innerText = "Vision Failed to Load";
-            document.getElementById('system-status').style.color = "red";
+            const status = document.getElementById('system-status');
+            status.innerText = "Vision Failed to Load";
+            status.style.color = "red";
         }
     </script>
 </body>
