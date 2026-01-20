@@ -21,40 +21,59 @@ window.enableVision = function() {
     log("Vision System Activated");
 };
 
-// --- 2. CAMERA & VISION LOOP ---
+// --- UPDATED CAMERA STARTUP (Fixes the "Blind Vision" bug) ---
+
 async function startCamera() {
     const video = document.getElementById('camera-feed');
     const canvas = document.getElementById('overlay-canvas');
     
     try {
-        // Use back camera
+        // 1. Get the Camera Stream
         const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "environment" } 
+            video: { 
+                facingMode: "environment",
+                width: { ideal: 1280 }, // Request higher res for better scanning
+                height: { ideal: 720 }
+            } 
         });
         video.srcObject = stream;
         
-        // SCANNING LOOP (Runs every 200ms)
+        // 2. THE FIX: Wait for video to actually load before setting dimensions
+        video.onloadedmetadata = () => {
+            video.play();
+            
+            // Force HTML attributes to match the incoming stream
+            // OpenCV NEEDS this to read the image data correctly
+            video.width = video.videoWidth;
+            video.height = video.videoHeight;
+            
+            // Sync Canvas too
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            log(`Camera Active: ${video.videoWidth}x${video.videoHeight}`);
+        };
+
+        // 3. Start the Scanning Loop
         setInterval(() => {
-            // SAFETY: Don't run if OpenCV isn't loaded
             if (!visionEnabled) return; 
 
             try {
-                // Check if plx-reader.js is loaded
                 if (typeof scanFrameForPLX === "function") {
                     
-                    // >>> THE SCAN <<<
+                    // PASS VIDEO & CANVAS TO READER
                     const detectedID = scanFrameForPLX(video, canvas); 
                     
-                    // If tag found AND 2 seconds have passed since last scan
+                    // If tag found AND cooldown passed
                     if (detectedID && (Date.now() - lastScanTime > 2000)) {
                         handleTagFound(detectedID);
                         lastScanTime = Date.now();
                     }
                 }
             } catch (err) {
-                // Silent catch to prevent loop crash
+               // Prevent crash
             }
-        }, 200); 
+        }, 100); // Speed up scan to 100ms for snappier feel
 
     } catch (err) {
         console.error("Camera Error:", err);
