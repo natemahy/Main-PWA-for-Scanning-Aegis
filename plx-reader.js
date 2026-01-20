@@ -1,4 +1,4 @@
-// --- PLX TAG READER (JS PORT) ---
+// --- PLX TAG READER (Adaptive Version) ---
 
 let cvReady = false;
 
@@ -20,14 +20,18 @@ function scanFrameForPLX(videoElement, canvasElement) {
     // 1. Setup CV Mats
     let src = new cv.Mat(videoElement.videoHeight, videoElement.videoWidth, cv.CV_8UC4);
     let cap = new cv.VideoCapture(videoElement);
-    cap.read(src); // Grab frame
+    cap.read(src);
 
     let gray = new cv.Mat();
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-    // 2. Threshold (Adjust 100 if needed, similar to your Python 'Darkness' slider)
+    // --- UPGRADE: ADAPTIVE THRESHOLD ---
+    // This handles warehouse lighting (shadows, glare) much better than fixed 100
     let binary = new cv.Mat();
-    cv.threshold(gray, binary, 100, 255, cv.THRESH_BINARY);
+    cv.adaptiveThreshold(gray, binary, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 21, 2);
+
+    // >>> DEBUG: UNCOMMENT THIS LINE TO SEE WHAT THE COMPUTER SEES <<<
+    // cv.imshow('overlay-canvas', binary); return null; 
 
     // 3. Find Contours
     let contours = new cv.MatVector();
@@ -39,30 +43,31 @@ function scanFrameForPLX(videoElement, canvasElement) {
     for (let i = 0; i < contours.size(); ++i) {
         let cnt = contours.get(i);
         let area = cv.contourArea(cnt);
-        if (area < 1000) continue; // Filter small noise
+        
+        // Filter noise: Must be decent size
+        if (area < 2000) continue; 
 
         let peri = cv.arcLength(cnt, true);
         let approx = new cv.Mat();
         cv.approxPolyDP(cnt, approx, 0.04 * peri, true);
 
         // Check for 4 corners (Square-ish shape)
-        if (approx.rows === 4) {
+        // We also check isContourConvex to avoid weird shapes
+        if (approx.rows === 4 && cv.isContourConvex(approx)) {
             
-            // Warp Perspective (The heavy lifting)
             let warped = warpTag(binary, approx);
             if (warped) {
                 // Read the Grid
                 let grid = readGrid(warped);
                 
-                // Try Decoding (Rotations + Mirrors)
+                // Try Decoding
                 let result = tryDecode(grid);
                 
                 if (result.valid) {
-                    foundTag = result.id;
-                    // Draw visual feedback (Green box) on canvas
+                    foundTag = "PLX-" + result.id; // Format ID nicely
                     drawGreenBox(canvasElement, approx);
                     warped.delete(); approx.delete();
-                    break; // Stop after finding one
+                    break; 
                 }
                 warped.delete();
             }
@@ -70,26 +75,27 @@ function scanFrameForPLX(videoElement, canvasElement) {
         approx.delete();
     }
 
-    // Cleanup Memory (Crucial in JS OpenCV)
+    // Cleanup Memory (CRITICAL)
     src.delete(); gray.delete(); binary.delete(); contours.delete(); hierarchy.delete();
+    
     return foundTag;
 }
 
 // --- HELPER: Perspective Warp ---
 function warpTag(binaryImage, approx) {
-    // Convert contour points to standard array
     let pts = [];
     for(let i=0; i<4; i++) {
         pts.push({ x: approx.data32S[i*2], y: approx.data32S[i*2+1] });
     }
 
-    // Sort corners: TL, TR, BR, BL (Simple sort logic)
+    // Robust Corner Sorting (TL, TR, BR, BL)
+    // 1. Sort by Y (Top 2 vs Bottom 2)
     pts.sort((a,b) => a.y - b.y);
     let top = pts.slice(0,2).sort((a,b) => a.x - b.x);
     let bot = pts.slice(2,4).sort((a,b) => a.x - b.x);
-    let corners = [top[0], top[1], bot[1], bot[0]]; // Order: TL, TR, BR, BL
+    // 2. Fix Cross-over: If BL is to the right of BR, swap (rare but happens)
+    let corners = [top[0], top[1], bot[1], bot[0]];
 
-    // Destination Dimensions
     let side = 300;
     let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
         corners[0].x, corners[0].y, corners[1].x, corners[1].y,
@@ -109,15 +115,21 @@ function warpTag(binaryImage, approx) {
 function readGrid(warpedImage) {
     let grid = [];
     let side = 300;
-    let cell = side / (GRID_SIZE + 2); // +2 for padding logic
+    // The tag is 7x7, but usually has a white border.
+    // We treat the warped image as just the internal 7x7 grid.
+    let cell = side / GRID_SIZE; 
 
     for(let row=0; row<GRID_SIZE; row++) {
         let rowData = [];
         for(let col=0; col<GRID_SIZE; col++) {
-            let cx = Math.floor((col + 1) * cell + (cell / 2));
-            let cy = Math.floor((row + 1) * cell + (cell / 2));
+            // Sample the CENTER of the cell
+            let cx = Math.floor(col * cell + (cell / 2));
+            let cy = Math.floor(row * cell + (cell / 2));
             
-            // Access pixel (1 channel)
+            // Pixel > 128 is WHITE (1), Black is (0)
+            // Note: Your Python code might have had Invert Mode. 
+            // If tags are White dots on Black, use > 128.
+            // If tags are Black dots on White, use < 128.
             let pixel = warpedImage.ucharPtr(cy, cx)[0];
             rowData.push(pixel > 128 ? 1 : 0);
         }
@@ -126,11 +138,44 @@ function readGrid(warpedImage) {
     return grid;
 }
 
-// --- HELPER: Decode Logic (The Python Port) ---
+// --- HELPER: Decode Logic (BigInt Math) ---
+function tryDecode(grid) {
+    // 1. Normal
+    let res = checkMath(grid);
+    if(res.valid) return res;
+
+    // 2. Rotate 90
+    grid = rotateGrid(grid);
+    res = checkMath(grid);
+    if(res.valid) return res;
+
+    // 3. Rotate 180
+    grid = rotateGrid(grid);
+    res = checkMath(grid);
+    if(res.valid) return res;
+
+    // 4. Rotate 270
+    grid = rotateGrid(grid);
+    res = checkMath(grid);
+    if(res.valid) return res;
+
+    return { valid: false };
+}
+
+function rotateGrid(grid) {
+    const N = grid.length;
+    let newGrid = Array.from({length:N}, () => Array(N).fill(0));
+    for(let r=0; r<N; r++) {
+        for(let c=0; c<N; c++) {
+            newGrid[c][N-1-r] = grid[r][c];
+        }
+    }
+    return newGrid;
+}
+
 function extractIdFromGrid(grid) {
-    let payload = 0n; // Use BigInt for >32 bits
+    let payload = 0n;
     let bitIndex = 0n;
-    
     for(let row=0; row<GRID_SIZE; row++) {
         for(let col=0; col<GRID_SIZE; col++) {
             if(grid[row][col] === 1) {
@@ -145,55 +190,45 @@ function extractIdFromGrid(grid) {
 function checkMath(grid) {
     let payload = extractIdFromGrid(grid);
     
-    // Unpack (Using BigInt math)
-    let readSafety = Number(payload & 0xFFn); // Bits 0-7
-    let readAnchors = Number((payload >> 45n) & 0xFn); // Bits 45-48
+    // Safety Number (Bits 0-7)
+    let readSafety = Number(payload & 0xFFn); 
     
-    // CHECK 1: Anchors must be 15 (1111)
+    // Anchors (Bits 45-48) - TOP 4 bits
+    let readAnchors = Number((payload >> 45n) & 0xFn);
+    
+    // 1. Check Anchor Bits (Must be 15 / 1111)
     if (readAnchors !== 15) return { valid: false };
 
-    // CHECK 2: Extract ID (Bits 8-44)
-    // Mask 37 bits: (1 << 37) - 1
+    // 2. Extract ID (Bits 8-44)
     let mask37 = (1n << 37n) - 1n;
     let readId = Number((payload >> 8n) & mask37);
     
-    // CHECK 3: Modulo Safety Check
+    // 3. Modulo Check
     if ((readId % 255) === readSafety && readId > 0) {
         return { valid: true, id: readId };
     }
     return { valid: false };
 }
 
-function tryDecode(bitGrid) {
-    // 1. Try Standard Rotations
-    let g = bitGrid;
-    for(let r=0; r<4; r++) {
-        let res = checkMath(g);
-        if(res.valid) return res;
-        g = rotateGrid(g);
-    }
-    // 2. Try Mirrored (Optional, based on your python code)
-    // You can implement flip logic if needed, but rotation catches most
-    return { valid: false };
-}
-
-function rotateGrid(grid) {
-    // Rotates 90 degrees clockwise
-    const N = grid.length;
-    let newGrid = Array.from({length:N}, () => Array(N).fill(0));
-    for(let r=0; r<N; r++) {
-        for(let c=0; c<N; c++) {
-            newGrid[c][N-1-r] = grid[r][c];
-        }
-    }
-    return newGrid;
-}
-
-// Draw green box on the overlay canvas
+// --- VISUALIZATION ---
 function drawGreenBox(canvas, approxPoly) {
     const ctx = canvas.getContext('2d');
-    canvas.width = canvas.clientWidth; 
-    canvas.height = canvas.clientHeight;
-    // (In a real implementation, you need to scale coordinates 
-    // from Video resolution to Canvas resolution. Skipped for brevity)
+    const video = document.getElementById('camera-feed');
+
+    if (canvas.width !== video.videoWidth) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.beginPath();
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "#00FF00"; 
+    
+    let pts = approxPoly.data32S; 
+    ctx.moveTo(pts[0], pts[1]);
+    ctx.lineTo(pts[2], pts[3]);
+    ctx.lineTo(pts[4], pts[5]);
+    ctx.lineTo(pts[6], pts[7]);
+    ctx.closePath();
+    ctx.stroke();
 }
