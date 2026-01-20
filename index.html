@@ -12,44 +12,48 @@
 
     <header>
         <div class="logo">PLX TRACKER</div>
-        <div id="status-badge" class="badge gps">GPS MODE</div>
+        <div class="toggle-container" onclick="toggleMode()">
+            <div id="mode-label">WAREHOUSE</div>
+            <div id="mode-icon">🏭</div>
+        </div>
     </header>
 
     <main>
         <div class="scanner-container">
-            <video id="camera-feed" autoplay playsinline></video>
-            <div class="overlay">
+            <video id="camera-feed" autoplay playsinline muted></video>
+            <canvas id="overlay-canvas"></canvas>
+            <div class="overlay-text">
                 <div class="scan-frame"></div>
-                <p>Align PLX Tag in Frame</p>
+                <p id="system-status" style="color: yellow;">Initializing...</p>
             </div>
         </div>
 
         <div class="uwb-container">
-            <h3>Facility Position <span id="coords-display">(Waiting...)</span></h3>
-            <div id="warehouse-map">
-                <div id="user-dot"></div>
-            </div>
+            <h3>System Log</h3>
+            <div id="log-feed" style="font-size: 12px; color: #94a3b8; overflow-y: auto; height: 100%;"></div>
         </div>
     </main>
 
     <footer>
-        <button id="btn-connect" onclick="connectToUWB()">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
-                <path d="M1.42 9a16 16 0 0 1 16 0"></path>
-                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
-                <line x1="12" y1="20" x2="12" y2="20"></line>
-            </svg>
-            Connect UWB Tool
-        </button>
+        <button id="btn-connect" onclick="connectToUWB()">Connect UWB Tool</button>
     </footer>
 
+    <script src="plx-reader.js"></script>
     <script src="app.js"></script>
+    
+    <script async src="https://docs.opencv.org/4.5.4/opencv.js" onload="onOpenCvReady();" onerror="onOpenCvError();"></script>
+
     <script>
-        // Register Service Worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-            .then(() => console.log('Service Worker Registered'));
+        function onOpenCvReady() {
+            console.log("OpenCV Loaded!");
+            // Tell app.js it is safe to start scanning
+            if(window.enableVision) window.enableVision(); 
+            document.getElementById('system-status').innerText = "Vision Ready - Align Tag";
+            document.getElementById('system-status').style.color = "#10b981"; // Green
+        }
+        function onOpenCvError() {
+            document.getElementById('system-status').innerText = "Vision Failed to Load";
+            document.getElementById('system-status').style.color = "red";
         }
     </script>
 </body>
