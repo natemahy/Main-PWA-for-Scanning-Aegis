@@ -17,12 +17,13 @@ window.enableVision = function() {
     log("Vision System Activated");
 };
 
-// --- 2. CAMERA LOOP (Safari Fix Included) ---
+// --- 2. CAMERA LOOP (With Safari Resolution Fix) ---
 async function startCamera() {
     const video = document.getElementById('camera-feed');
     const canvas = document.getElementById('overlay-canvas');
     
     try {
+        // Request High Resolution for clearer scanning
         const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
                 facingMode: "environment",
@@ -32,13 +33,20 @@ async function startCamera() {
         });
         video.srcObject = stream;
         
-        // FIX: Wait for video to load dimensions
+        // FIX: Wait for video to load metadata to get real size
         video.onloadedmetadata = () => {
             video.play();
+            
+            // Force HTML to match internal stream resolution
+            // This is required for OpenCV to read pixels correctly
             video.width = video.videoWidth;
             video.height = video.videoHeight;
+            
+            // Sync Canvas to match
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+            
+            log(`Camera Active: ${video.videoWidth}x${video.videoHeight}`);
         };
         
         // SCAN LOOP
@@ -49,17 +57,20 @@ async function startCamera() {
                 if (typeof scanFrameForPLX === "function") {
                     const detectedID = scanFrameForPLX(video, canvas); 
                     
+                    // If tag found AND cooldown (2s) passed
                     if (detectedID && (Date.now() - lastScanTime > 2000)) {
                         handleTagFound(detectedID);
                         lastScanTime = Date.now();
                     }
                 }
-            } catch (err) {}
-        }, 100); 
+            } catch (err) {
+                // Prevent loop crash on error
+            }
+        }, 100); // 100ms = Fast scanning
 
     } catch (err) {
         console.error("Camera Error:", err);
-        log("Camera failed.");
+        log("Camera failed to start.");
     }
 }
 startCamera();
@@ -116,7 +127,7 @@ function handleTagFound(tagID) {
     sendToServer(tagID, locationData);
 }
 
-// --- 5. SERVER ---
+// --- 5. SERVER UPLOAD ---
 async function sendToServer(tagID, locData) {
     const payload = {
         plx_id: tagID,
@@ -136,12 +147,13 @@ async function sendToServer(tagID, locData) {
     }
 }
 
-// --- 6. POPUP ---
+// --- 6. POPUP UI ---
 function showPopup(tagID) {
     const popup = document.getElementById('scan-popup');
     const text = document.getElementById('popup-text');
     text.innerText = `Tag: ${tagID} Recorded`;
     popup.classList.add('visible');
+    
     if (popupTimeout) clearTimeout(popupTimeout);
     popupTimeout = setTimeout(() => hidePopup(), 2000);
 }
@@ -149,7 +161,7 @@ window.hidePopup = function() {
     document.getElementById('scan-popup').classList.remove('visible');
 }
 
-// --- 7. UWB ---
+// --- 7. UWB CONNECTION ---
 window.connectToUWB = async function() {
     try {
         log('Scanning for Tool...');
@@ -180,13 +192,14 @@ window.connectToUWB = async function() {
     }
 };
 
-// --- 8. GPS ---
+// --- 8. GPS LOGIC ---
 function startGPS() {
     if ("geolocation" in navigator) {
         navigator.geolocation.watchPosition((pos) => {
             currentGPS.lat = pos.coords.latitude;
             currentGPS.lng = pos.coords.longitude;
             currentGPS.acc = pos.coords.accuracy;
+            
             if(mode === "YARD") {
                 const display = document.getElementById('coords-display');
                 if(display) display.innerText = `(GPS: ±${Math.round(pos.coords.accuracy)}m)`;
