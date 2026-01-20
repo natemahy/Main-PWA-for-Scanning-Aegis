@@ -1,88 +1,70 @@
 // --- CONFIGURATION ---
 const API_URL = "https://your-server.com/api/save-asset-location"; 
-
-// UUIDs matching your ESP32 Firmware
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-// --- STATE VARIABLES ---
-let mode = "WAREHOUSE"; // Default: WAREHOUSE or YARD
-let uwbRanges = {};     // Stores UWB distances: { "10": 4.5, "22": 8.1 }
-let lastScanTime = 0;   // Cooldown timer
-let visionEnabled = false; // Safety Flag
+// --- STATE ---
+let mode = "WAREHOUSE"; 
+let uwbRanges = {};     
+let lastScanTime = 0;   
+let visionEnabled = false; 
 let currentGPS = { lat: null, lng: null, acc: null };
-let popupTimeout; // For the popup timer
+let popupTimeout;
 
 // --- 1. INITIALIZATION ---
-
-// Called by index.html when OpenCV is fully loaded
 window.enableVision = function() {
     visionEnabled = true;
     log("Vision System Activated");
 };
 
-// --- UPDATED CAMERA STARTUP (Fixes the "Blind Vision" bug) ---
-
+// --- 2. CAMERA LOOP (Safari Fix Included) ---
 async function startCamera() {
     const video = document.getElementById('camera-feed');
     const canvas = document.getElementById('overlay-canvas');
     
     try {
-        // 1. Get the Camera Stream
         const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
                 facingMode: "environment",
-                width: { ideal: 1280 }, // Request higher res for better scanning
+                width: { ideal: 1280 },
                 height: { ideal: 720 }
             } 
         });
         video.srcObject = stream;
         
-        // 2. THE FIX: Wait for video to actually load before setting dimensions
+        // FIX: Wait for video to load dimensions
         video.onloadedmetadata = () => {
             video.play();
-            
-            // Force HTML attributes to match the incoming stream
-            // OpenCV NEEDS this to read the image data correctly
             video.width = video.videoWidth;
             video.height = video.videoHeight;
-            
-            // Sync Canvas too
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            
-            log(`Camera Active: ${video.videoWidth}x${video.videoHeight}`);
         };
-
-        // 3. Start the Scanning Loop
+        
+        // SCAN LOOP
         setInterval(() => {
             if (!visionEnabled) return; 
 
             try {
                 if (typeof scanFrameForPLX === "function") {
-                    
-                    // PASS VIDEO & CANVAS TO READER
                     const detectedID = scanFrameForPLX(video, canvas); 
                     
-                    // If tag found AND cooldown passed
                     if (detectedID && (Date.now() - lastScanTime > 2000)) {
                         handleTagFound(detectedID);
                         lastScanTime = Date.now();
                     }
                 }
-            } catch (err) {
-               // Prevent crash
-            }
-        }, 100); // Speed up scan to 100ms for snappier feel
+            } catch (err) {}
+        }, 100); 
 
     } catch (err) {
         console.error("Camera Error:", err);
-        log("Camera failed. Check Permissions.");
+        log("Camera failed.");
     }
 }
-startCamera(); // Auto-start
+startCamera();
 
-// --- 3. MODE TOGGLE LOGIC ---
+// --- 3. MODE TOGGLE ---
 window.toggleMode = function() { 
     const label = document.getElementById('mode-label');
     const icon = document.getElementById('mode-icon');
@@ -91,7 +73,7 @@ window.toggleMode = function() {
         mode = "YARD";
         label.innerText = "YARD (GPS)";
         icon.innerText = "🚜";
-        startGPS(); // Ensure GPS is watching
+        startGPS();
         log("Switched to YARD mode");
     } else {
         mode = "WAREHOUSE";
@@ -101,32 +83,25 @@ window.toggleMode = function() {
     }
 };
 
-// --- 4. DATA HANDLING (The Brain) ---
+// --- 4. DATA HANDLING ---
 function handleTagFound(tagID) {
-    // 1. Show Visual Feedback immediately
     showPopup(tagID);
     log(`✅ SCANNED: ${tagID}`);
     
     let locationData = {};
     
-    // 2. Attach Location Data based on Mode
     if (mode === "WAREHOUSE") {
         const anchorCount = Object.keys(uwbRanges).length;
-        
-        // Warning if no UWB connected
-        if (anchorCount === 0) {
-            log("⚠️ Warning: No UWB Anchors detected!");
-        }
+        if (anchorCount === 0) log("⚠️ Warning: No UWB Anchors detected!");
         
         locationData = {
             type: "UWB",
-            ranges: { ...uwbRanges } // Clone data
+            ranges: { ...uwbRanges } 
         };
     } 
     else if (mode === "YARD") {
         if (!currentGPS.lat) {
             log("⚠️ Waiting for GPS Lock...");
-            // We still send the scan, just without GPS
             locationData = { type: "GPS_PENDING" };
         } else {
             locationData = {
@@ -141,7 +116,7 @@ function handleTagFound(tagID) {
     sendToServer(tagID, locationData);
 }
 
-// --- 5. SERVER UPLOAD ---
+// --- 5. SERVER ---
 async function sendToServer(tagID, locData) {
     const payload = {
         plx_id: tagID,
@@ -154,46 +129,27 @@ async function sendToServer(tagID, locData) {
     console.log("UPLOADING:", payload);
     
     try {
-        // --- REAL FETCH (Uncomment to use) ---
-        /*
-        const response = await fetch(API_URL, {
-             method: "POST",
-             headers: { "Content-Type": "application/json" },
-             body: JSON.stringify(payload)
-        });
-        */
-        
-        // Simulation Success
+        // await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
         log(`Saved ${tagID} to DB.`);
-        
     } catch (e) {
-        console.error("Upload Error:", e);
         log("❌ Upload Failed.");
     }
 }
 
-// --- 6. POPUP UI LOGIC ---
+// --- 6. POPUP ---
 function showPopup(tagID) {
     const popup = document.getElementById('scan-popup');
     const text = document.getElementById('popup-text');
-    
     text.innerText = `Tag: ${tagID} Recorded`;
     popup.classList.add('visible');
-    
-    // Clear old timer
     if (popupTimeout) clearTimeout(popupTimeout);
-    
-    // Hide after 2 seconds
-    popupTimeout = setTimeout(() => {
-        hidePopup();
-    }, 2000);
+    popupTimeout = setTimeout(() => hidePopup(), 2000);
 }
-
 window.hidePopup = function() {
     document.getElementById('scan-popup').classList.remove('visible');
 }
 
-// --- 7. UWB CONNECTION (BLE) ---
+// --- 7. UWB ---
 window.connectToUWB = async function() {
     try {
         log('Scanning for Tool...');
@@ -201,17 +157,14 @@ window.connectToUWB = async function() {
             filters: [{ name: 'PLX_Handheld' }], 
             optionalServices: [SERVICE_UUID]
         });
-
         const server = await device.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
         const characteristic = await service.getCharacteristic(CHAR_UUID);
-
         await characteristic.startNotifications();
         
         characteristic.addEventListener('characteristicvaluechanged', (event) => {
             const value = new TextDecoder().decode(event.target.value);
             try {
-                // Parse: {"id":10, "d":5.2}
                 const data = JSON.parse(value);
                 uwbRanges[data.id] = data.d;
             } catch (e) {}
@@ -220,40 +173,33 @@ window.connectToUWB = async function() {
         log("UWB Connected!");
         const btn = document.getElementById('btn-connect');
         btn.innerText = "Tool Connected";
-        btn.style.background = "#10b981"; // Green
+        btn.style.background = "#10b981";
         btn.disabled = true;
-
     } catch (error) {
-        log("BLE Failed. Use Bluefy App.");
+        log("BLE Failed.");
     }
 };
 
-// --- 8. GPS LOGIC ---
+// --- 8. GPS ---
 function startGPS() {
     if ("geolocation" in navigator) {
         navigator.geolocation.watchPosition((pos) => {
             currentGPS.lat = pos.coords.latitude;
             currentGPS.lng = pos.coords.longitude;
             currentGPS.acc = pos.coords.accuracy;
-            
-            // Update UI if in Yard Mode
             if(mode === "YARD") {
                 const display = document.getElementById('coords-display');
                 if(display) display.innerText = `(GPS: ±${Math.round(pos.coords.accuracy)}m)`;
             }
-        }, (err) => {
-            log("GPS Error. Check Settings.");
-        }, { enableHighAccuracy: true });
+        }, (err) => log("GPS Error."), { enableHighAccuracy: true });
     }
 }
 
-// --- HELPER: LOGGING ---
 function log(msg) {
     const feed = document.getElementById('log-feed');
     if (feed) {
         const div = document.createElement('div');
-        const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' });
-        div.innerText = `[${time}] ${msg}`;
+        div.innerText = `> ${msg}`;
         feed.insertBefore(div, feed.firstChild);
     }
 }
